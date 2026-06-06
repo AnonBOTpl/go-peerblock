@@ -109,6 +109,13 @@ func parseCIDR(data []byte) ([]IPRange, error) {
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
 			continue
 		}
+		// Strip inline comments after CIDR (e.g. "1.2.3.0/24 ; comment" or "1.2.3.0/24 # comment")
+		if idx := strings.IndexAny(line, ";#"); idx != -1 {
+			line = strings.TrimSpace(line[:idx])
+			if line == "" {
+				continue
+			}
+		}
 		r, err := CIDRToRange(line)
 		if err != nil {
 			continue

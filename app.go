@@ -75,10 +75,16 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize updater
 	fetcher := updater.NewFetcher(filepath.Join(getAppDataDir(), "cache"))
-	a.updater = updater.NewUpdater(cfg.Sources, fetcher, func(newDB *core.IPDatabase) {
-		a.db.Store(newDB)
-		a.logger.Info("Baza IP przeładowana: %d zakresów", len(newDB.Ranges()))
-	})
+	a.updater = updater.NewUpdater(cfg.Sources, fetcher,
+		func(newDB *core.IPDatabase) {
+			a.db.Store(newDB)
+			a.logger.Info("Baza IP przeładowana: %d zakresów", len(newDB.Ranges()))
+		},
+		func(format string, args ...interface{}) {
+			a.logger.Info(format, args...)
+		},
+		cfg.UpdateInterval,
+	)
 	go a.updater.Run(ctx)
 
 	// Initialize WinDivert and pipeline (if protection is enabled)

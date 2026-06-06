@@ -58,6 +58,17 @@ Wszystkie istotne zmiany w projekcie są dokumentowane w tym pliku.
 - WebView2: jawne sprawdzanie bootstrappera w instalatorze NSIS
 - Uptime: zmiana z `time.Time` na `int64` (UnixNano) dla czystej serializacji JSON
 
+### Dodano
+- GUI Źródła: lista źródeł blokad z przełącznikami włącz/wyłącz
+- Parser CIDR: usuwanie komentarzy inline (po `;` lub `#`) dla formatu Spamhaus DROP (`1.2.3.0/24 ; SBL123`)
+- Logger updatera: komunikaty postępu per-źródło widoczne w panelu logów GUI
+- Konfigurowalny interwał aktualizacji z config.json
+- Fetcher: nagłówek User-Agent i automatyczna dekompresja gzip
+
+### Zmieniono
+- Domyślne źródła: zastąpiono martwy iblocklist-level1 działającym firehol-level2
+- API Updatera: `NewUpdater` przyjmuje `LogFunc` callback i konfigurowalny `interval`
+
 ### Naprawiono
 - Nieskończona pętla WinDivert: dodano sprawdzanie flagi Impostor — reinjektowane pakiety pomijają pipeline (przerywa pętlę przechwytywania, przywraca internet)
 - Wyciek uchwytu WinDivert: `ToggleProtection` i `SetProtectionEnabled` używają `Close()` zamiast `Stop()`, poprawnie zamykając uchwyt

@@ -20,15 +20,15 @@ var DefaultSources = []Source{
 		Enabled: true,
 	},
 	{
-		Name:    "spamhaus-drop",
-		URL:     "https://www.spamhaus.org/drop/drop.txt",
+		Name:    "firehol-level2",
+		URL:     "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
 		Format:  3, // FormatCIDR
 		Enabled: true,
 	},
 	{
-		Name:    "iblocklist-level1",
-		URL:     "https://list.iblocklist.com/?list=ydxerpxkpcfqjaybcssw&fileformat=p2p&archiveformat=gz",
-		Format:  1, // FormatP2PText
+		Name:    "spamhaus-drop",
+		URL:     "https://www.spamhaus.org/drop/drop.txt",
+		Format:  3, // FormatCIDR
 		Enabled: true,
 	},
 }

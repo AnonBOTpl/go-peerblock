@@ -2,7 +2,6 @@ package updater
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -12,24 +11,32 @@ import (
 // ReloadFunc is called when the database is updated.
 type ReloadFunc func(*core.IPDatabase)
 
+// LogFunc is called for progress messages during updates.
+type LogFunc func(format string, args ...interface{})
+
 // Updater orchestrates periodic IP list updates.
 type Updater struct {
-	sources      []Source
-	fetcher      *Fetcher
-	parser       interface{} // placeholder for parser
-	onReload     ReloadFunc
-	logger       *log.Logger
+	sources       []Source
+	fetcher       *Fetcher
+	onReload      ReloadFunc
+	logFn         LogFunc
+	interval      time.Duration
 	manualTrigger chan struct{}
-	mu           sync.Mutex
-	running      bool
+	mu            sync.Mutex
+	running       bool
 }
 
 // NewUpdater creates a new Updater.
-func NewUpdater(sources []Source, fetcher *Fetcher, onReload ReloadFunc) *Updater {
+func NewUpdater(sources []Source, fetcher *Fetcher, onReload ReloadFunc, logFn LogFunc, interval time.Duration) *Updater {
+	if interval <= 0 {
+		interval = 24 * time.Hour
+	}
 	return &Updater{
 		sources:       sources,
 		fetcher:       fetcher,
 		onReload:      onReload,
+		logFn:         logFn,
+		interval:      interval,
 		manualTrigger: make(chan struct{}, 1),
 	}
 }
@@ -46,18 +53,22 @@ func (u *Updater) Run(ctx context.Context) {
 		u.mu.Unlock()
 	}()
 
+	u.logf("Rozpoczynam aktualizację list IP...")
 	u.updateAll()
 
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(u.interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
+			u.logf("Zaplanowana aktualizacja list IP...")
 			u.updateAll()
 		case <-u.manualTrigger:
+			u.logf("Ręczne wyzwolenie aktualizacji...")
 			u.updateAll()
 		case <-ctx.Done():
+			u.logf("Aktualizator zatrzymany")
 			return
 		}
 	}
@@ -110,7 +121,7 @@ func (u *Updater) updateAll() {
 }
 
 func (u *Updater) logf(format string, args ...interface{}) {
-	if u.logger != nil {
-		u.logger.Printf(format, args...)
+	if u.logFn != nil {
+		u.logFn(format, args...)
 	}
 }

@@ -1,6 +1,8 @@
 package updater
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,9 +21,13 @@ type Fetcher struct {
 
 // NewFetcher creates a new Fetcher.
 func NewFetcher(cacheDir string) *Fetcher {
+	tr := &http.Transport{
+		DisableCompression: false, // allow Go to auto-decompress gzip when Content-Encoding is set
+	}
 	return &Fetcher{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: tr,
 		},
 		cacheDir: cacheDir,
 		maxRetry: 3,
@@ -50,7 +56,13 @@ func (f *Fetcher) Fetch(src Source) ([]byte, error) {
 }
 
 func (f *Fetcher) fetchOnce(url string) ([]byte, error) {
-	resp, err := f.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "go-peerblock/0.1")
+
+	resp, err := f.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +79,26 @@ func (f *Fetcher) fetchOnce(url string) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty response")
 	}
+
+	// Auto-decompress gzip if server returned raw gzip (without Content-Encoding header)
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		return f.decompressGzip(data)
+	}
+
 	return data, nil
+}
+
+func (f *Fetcher) decompressGzip(data []byte) ([]byte, error) {
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("gzip decompress: %w", err)
+	}
+	defer gr.Close()
+	out, err := io.ReadAll(gr)
+	if err != nil {
+		return nil, fmt.Errorf("gzip read: %w", err)
+	}
+	return out, nil
 }
 
 func (f *Fetcher) saveToCache(name string, data []byte) {

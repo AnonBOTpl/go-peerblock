@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback, type FC } from 'react';
 import './App.css';
-import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo } from "../wailsjs/go/main/App";
-import { filter, logger } from "../wailsjs/go/models";
+import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetConfig, SaveConfig } from "../wailsjs/go/main/App";
+import { config, filter, logger, updater } from "../wailsjs/go/models";
 type Stats = filter.Stats;
 type LogEntry = logger.LogEntry;
+type Source = updater.Source;
+type Tab = 'dashboard' | 'sources';
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -18,6 +20,14 @@ interface StatCardProps {
   unit?: string;
   color: string;
 }
+
+const FORMAT_LABELS: Record<number, string> = {
+  0: 'Auto',
+  1: 'P2P',
+  2: 'DAT',
+  3: 'CIDR',
+  4: 'Zakres',
+};
 
 // ─── Stat Card ───────────────────────────────────────────
 
@@ -38,12 +48,12 @@ function StatCard({ label, value, unit, color }: StatCardProps) {
 function LogView({ logs, onClear }: LogViewProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [filter, setFilter] = useState<string>('ALL');
+  const [filter_, setFilter_] = useState<string>('ALL');
 
   const filteredLogs = logs.filter(e => {
-    if (filter === 'ALL') return true;
-    if (filter === 'BLOCKED') return e.level === 0 && e.message.includes('BLOCK');
-    if (filter === 'ERROR') return e.level >= 3;
+    if (filter_ === 'ALL') return true;
+    if (filter_ === 'BLOCKED') return e.message.includes('BLOCK');
+    if (filter_ === 'ERROR') return e.level >= 3;
     return true;
   });
 
@@ -77,7 +87,7 @@ function LogView({ logs, onClear }: LogViewProps) {
     <div className="log-view">
       <div className="log-toolbar">
         <span className="log-title">Logi zdarzeń</span>
-        <select value={filter} onChange={e => setFilter(e.target.value)} className="log-filter">
+        <select value={filter_} onChange={e => setFilter_(e.target.value)} className="log-filter">
           <option value="ALL">Wszystkie</option>
           <option value="BLOCKED">Blokady</option>
           <option value="ERROR">Błędy</option>
@@ -105,6 +115,133 @@ function LogView({ logs, onClear }: LogViewProps) {
   );
 }
 
+// ─── Sources View ────────────────────────────────────────
+
+function SourcesView({ onUpdate }: { onUpdate: () => void }) {
+  const [cfg, setCfg] = useState<config.Config | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadConfig = useCallback(async () => {
+    try {
+      const c = await GetConfig();
+      setCfg(c);
+    } catch (err) {
+      console.error('load config error', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const toggleSource = async (index: number) => {
+    if (!cfg) return;
+    const sources = cfg.sources.map((s, i) => {
+      if (i !== index) return s;
+      return new updater.Source({ ...s, enabled: !s.enabled });
+    });
+    const updated = new config.Config({ ...cfg, sources });
+    setCfg(updated);
+    setSaving(true);
+    try {
+      await SaveConfig(updated);
+    } catch (err) {
+      console.error('save config error', err);
+    }
+    setSaving(false);
+  };
+
+  if (!cfg) {
+    return <div className="sources-loading">Ładowanie konfiguracji...</div>;
+  }
+
+  return (
+    <div className="sources-view">
+      <div className="sources-header">
+        <h2>Źródła list IP</h2>
+        <button className="update-btn" onClick={onUpdate}>
+          ↻ Aktualizuj teraz
+        </button>
+      </div>
+      <p className="sources-desc">
+        Włącz lub wyłącz źródła blokad IP. Zmiany są zapisywane automatycznie.
+        Kliknij "Aktualizuj teraz" aby pobrać wybrane listy.
+      </p>
+      <div className="sources-list">
+        {cfg.sources.map((src, i) => (
+          <div key={i} className={`source-card ${src.enabled ? 'enabled' : 'disabled'}`}>
+            <div className="source-info">
+              <div className="source-name">{src.name}</div>
+              <div className="source-url" title={src.url}>{src.url}</div>
+              <div className="source-meta">
+                <span className="source-format-badge">{FORMAT_LABELS[src.format] || '?'}</span>
+                {src.last_sync && (
+                  <span className="source-last-sync">
+                    Ostatnia synchronizacja: {new Date(src.last_sync).toLocaleString('pl-PL')}
+                  </span>
+                )}
+              </div>
+            </div>
+            <label className="source-toggle">
+              <input
+                type="checkbox"
+                checked={src.enabled}
+                onChange={() => toggleSource(i)}
+              />
+              <span className="toggle-track">
+                <span className="toggle-indicator" />
+              </span>
+              <span className="toggle-status">{src.enabled ? 'Aktywne' : 'Wyłączone'}</span>
+            </label>
+          </div>
+        ))}
+      </div>
+      {saving && <div className="sources-saving">Zapisywanie...</div>}
+    </div>
+  );
+}
+
+// ─── Dashboard ───────────────────────────────────────────
+
+function Dashboard({ stats, uptime, dbInfo, protected_, onToggle }: {
+  stats: Stats | null;
+  uptime: string;
+  dbInfo: Record<string, any>;
+  protected_: boolean;
+  onToggle: () => void;
+}) {
+  const blockedRate = stats && (stats.blocked + stats.allowed) > 0
+    ? ((stats.blocked / (stats.blocked + stats.allowed)) * 100).toFixed(1)
+    : '0.0';
+
+  return (
+    <>
+      {/* Protection Toggle */}
+      <div className="toggle-section">
+        <button
+          className={`toggle-btn ${protected_ ? 'on' : 'off'}`}
+          onClick={onToggle}
+        >
+          <div className="toggle-knob" />
+          <span className="toggle-label">
+            {protected_ ? 'Ochrona aktywna' : 'Ochrona wyłączona'}
+          </span>
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <StatCard label="Zablokowane" value={stats?.blocked ?? 0} color="#ef4444" />
+        <StatCard label="Przepuszczone" value={stats?.allowed ?? 0} color="#22c55e" />
+        <StatCard label="Współczynnik blokad" value={blockedRate} unit="%" color="#f59e0b" />
+        <StatCard label="Zakresy IP" value={dbInfo['ranges'] ?? 0} color="#3b82f6" />
+        <StatCard label="Uptime" value={uptime} color="#8b5cf6" />
+        <StatCard label="Upuszczone" value={stats?.dropped ?? 0} color="#64748b" />
+      </div>
+    </>
+  );
+}
+
 // ─── Main App ────────────────────────────────────────────
 
 function App() {
@@ -113,6 +250,7 @@ function App() {
   const [protected_, setProtected_] = useState(false);
   const [dbInfo, setDbInfo] = useState<Record<string, any>>({});
   const [uptime, setUptime] = useState('0s');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   // Fetch stats periodically
   const refresh = useCallback(async () => {
@@ -136,10 +274,10 @@ function App() {
     return () => clearInterval(interval);
   }, [refresh]);
 
-  // Format uptime (started_at is UnixNano from Go)
+  // Format uptime
   useEffect(() => {
     if (!stats?.started_at || stats.started_at === 0) return;
-    const start = Math.floor(stats.started_at / 1_000_000); // UnixNano → ms
+    const start = Math.floor(stats.started_at / 1_000_000);
     const update = () => {
       const diff = Math.floor((Date.now() - start) / 1000);
       const h = Math.floor(diff / 3600);
@@ -165,10 +303,6 @@ function App() {
     setLogs([]);
   };
 
-  const blockedRate = stats && (stats.blocked + stats.allowed) > 0
-    ? ((stats.blocked / (stats.blocked + stats.allowed)) * 100).toFixed(1)
-    : '0.0';
-
   return (
     <div className="app">
       {/* Header */}
@@ -184,57 +318,38 @@ function App() {
         </div>
       </header>
 
+      {/* Tab Navigation */}
+      <nav className="tab-nav">
+        <button
+          className={`tab-btn ${tab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setTab('dashboard')}
+        >
+          📊 Dashboard
+        </button>
+        <button
+          className={`tab-btn ${tab === 'sources' ? 'active' : ''}`}
+          onClick={() => setTab('sources')}
+        >
+          📋 Źródła list IP
+        </button>
+      </nav>
+
       {/* Main Content */}
       <main className="app-main">
-        {/* Protection Toggle */}
-        <div className="toggle-section">
-          <button
-            className={`toggle-btn ${protected_ ? 'on' : 'off'}`}
-            onClick={handleToggle}
-          >
-            <div className="toggle-knob" />
-            <span className="toggle-label">
-              {protected_ ? 'Ochrona aktywna' : 'Ochrona wyłączona'}
-            </span>
-          </button>
-        </div>
+        {tab === 'dashboard' && (
+          <Dashboard
+            stats={stats}
+            uptime={uptime}
+            dbInfo={dbInfo}
+            protected_={protected_}
+            onToggle={handleToggle}
+          />
+        )}
+        {tab === 'sources' && (
+          <SourcesView onUpdate={handleUpdate} />
+        )}
 
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <StatCard
-            label="Zablokowane"
-            value={stats?.blocked ?? 0}
-            color="#ef4444"
-          />
-          <StatCard
-            label="Przepuszczone"
-            value={stats?.allowed ?? 0}
-            color="#22c55e"
-          />
-          <StatCard
-            label="Współczynnik blokad"
-            value={blockedRate}
-            unit="%"
-            color="#f59e0b"
-          />
-          <StatCard
-            label="Zakresy IP"
-            value={dbInfo['ranges'] ?? 0}
-            color="#3b82f6"
-          />
-          <StatCard
-            label="Uptime"
-            value={uptime}
-            color="#8b5cf6"
-          />
-          <StatCard
-            label="Upuszczone"
-            value={stats?.dropped ?? 0}
-            color="#64748b"
-          />
-        </div>
-
-        {/* Logs */}
+        {/* Logs (always visible) */}
         <LogView logs={logs} onClear={handleClearLogs} />
       </main>
 
@@ -244,9 +359,10 @@ function App() {
         <span>{protected_ ? 'Ochrona aktywna' : 'Ochrona wyłączona'}</span>
         {stats && (
           <span className="status-fps">
-            Pakiety: {stats.blocked + stats.allowed}
+            Pakiety: {(stats.blocked + stats.allowed).toLocaleString()}
           </span>
         )}
+        <span className="status-tab">{tab === 'dashboard' ? 'Dashboard' : 'Źródła'}</span>
       </footer>
     </div>
   );
