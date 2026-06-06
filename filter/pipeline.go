@@ -40,7 +40,16 @@ func NewPipeline(wd *WinDivert, db *core.IPDatabase, cache *core.DecisionCache, 
 		packetCh:    make(chan Packet, 4096),
 		sendCh:      make(chan Packet, 4096),
 		workerCount: workerCount,
+		stats:       sv,
 		done:        make(chan struct{}),
+	}
+}
+
+// Close shuts down the pipeline and closes the WinDivert handle.
+func (p *Pipeline) Close() {
+	p.Stop()
+	if p.wd != nil {
+		p.wd.Close()
 	}
 }
 
@@ -96,6 +105,18 @@ func (p *Pipeline) recvLoop() {
 			}
 		}
 
+		// Impostor flag = packet was re-injected by us. Send it back immediately
+		// to prevent infinite loop (recv → process → send → recv → ...).
+		if isImpostor(addr) {
+			_, err := p.wd.Send(buf[:n], addr)
+			if err != nil {
+				s := p.stats.Load().(Stats)
+				s.Dropped++
+				p.stats.Store(s)
+			}
+			continue
+		}
+
 		pkt := Packet{Data: make([]byte, n)}
 		pkt.Addr = addr
 		copy(pkt.Data, buf[:n])
@@ -112,27 +133,47 @@ func (p *Pipeline) recvLoop() {
 }
 
 func (p *Pipeline) worker() {
-	for pkt := range p.packetCh {
-		if p.shouldBlock(pkt) {
+	for {
+		select {
+		case <-p.done:
+			return
+		case pkt, ok := <-p.packetCh:
+			if !ok {
+				return
+			}
+			if p.shouldBlock(pkt) {
+				s := p.stats.Load().(Stats)
+				s.Blocked++
+				p.stats.Store(s)
+				continue
+			}
 			s := p.stats.Load().(Stats)
-			s.Blocked++
+			s.Allowed++
 			p.stats.Store(s)
-			continue
+			select {
+			case <-p.done:
+				return
+			case p.sendCh <- pkt:
+			}
 		}
-		s := p.stats.Load().(Stats)
-		s.Allowed++
-		p.stats.Store(s)
-		p.sendCh <- pkt
 	}
 }
 
 func (p *Pipeline) sendLoop() {
-	for pkt := range p.sendCh {
-		_, err := p.wd.Send(pkt.Data, pkt.Addr)
-		if err != nil {
-			s := p.stats.Load().(Stats)
-			s.Dropped++
-			p.stats.Store(s)
+	for {
+		select {
+		case <-p.done:
+			return
+		case pkt, ok := <-p.sendCh:
+			if !ok {
+				return
+			}
+			_, err := p.wd.Send(pkt.Data, pkt.Addr)
+			if err != nil {
+				s := p.stats.Load().(Stats)
+				s.Dropped++
+				p.stats.Store(s)
+			}
 		}
 	}
 }

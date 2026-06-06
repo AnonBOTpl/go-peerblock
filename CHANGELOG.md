@@ -59,6 +59,11 @@ All notable changes to this project will be documented in this file.
 - Uptime: changed from `time.Time` to `int64` (UnixNano) for clean JSON serialization
 
 ### Fixed
+- WinDivert infinite loop: added Impostor flag check — re-injected packets bypass pipeline (prevents capture loop, restoring internet connectivity)
+- WinDivert handle leak: `ToggleProtection` and `SetProtectionEnabled` now use `Close()` instead of `Stop()`, properly closing the WinDivert handle
+- Pipeline goroutine leak: worker/sendLoop now use `select` with `<-p.done` for clean shutdown
+- `startProtection()`: closes existing pipeline before creating a new one (prevents duplicate WinDivert handles)
+- `isAdmin()`: removed incorrect `os.IsPermission(err)` check which falsely reported non-admin users as admin
 - CGO build: downgraded mingw-w64 to 13.2.0 (16.1.0 was missing `stddef.h`)
 - TypeScript bindings: fixed namespace imports for `filter.Stats` and `logger.LogEntry`
 

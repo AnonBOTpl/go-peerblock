@@ -5,7 +5,7 @@ import (
 )
 
 // Packet represents a captured network packet.
-// Addr holds the WinDivert address (gowindivert.Address when built with windivert tag).
+// Addr holds the WinDivert address as raw bytes ([]byte) when built with windivert tag.
 type Packet struct {
 	Data    []byte
 	Addr    interface{}
@@ -14,6 +14,19 @@ type Packet struct {
 	SrcPort uint16
 	DstPort uint16
 	Proto   uint8
+}
+
+// isImpostor checks the Impostor bit in a WINDIVERT_ADDRESS byte slice.
+// The Impostor flag (bit 19) is set by WinDivert for re-injected packets.
+func isImpostor(addr interface{}) bool {
+	b, ok := addr.([]byte)
+	if !ok || len(b) < 12 {
+		return false
+	}
+	// Flags UINT32 is at offset 8 (after INT64 Timestamp) in WINDIVERT_ADDRESS.
+	// Impostor = bit 19: Layer(0-7) + Event(8-15) + Sniffed(16) + Outbound(17) + Loopback(18) + Impostor(19)
+	flags := binary.LittleEndian.Uint32(b[8:12])
+	return (flags>>19)&1 == 1
 }
 
 // Stats holds pipeline statistics.

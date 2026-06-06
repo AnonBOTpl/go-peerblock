@@ -90,7 +90,8 @@ func (a *App) startup(ctx context.Context) {
 // shutdown is called when the Wails application exits.
 func (a *App) shutdown(ctx context.Context) {
 	if a.pipeline != nil {
-		a.pipeline.Stop()
+		a.pipeline.Close()
+		a.pipeline = nil
 	}
 	if a.logger != nil {
 		_ = a.logger.Close()
@@ -137,12 +138,9 @@ func (a *App) IsProtectionEnabled() bool {
 
 // ToggleProtection toggles packet filtering on/off.
 func (a *App) ToggleProtection() {
-	if a.pipeline == nil {
-		a.startProtection()
-		return
-	}
-	if a.pipeline.IsRunning() {
-		a.pipeline.Stop()
+	if a.pipeline != nil && a.pipeline.IsRunning() {
+		a.pipeline.Close()
+		a.pipeline = nil
 		a.logger.Info("Ochrona wyłączona")
 	} else {
 		a.startProtection()
@@ -155,7 +153,8 @@ func (a *App) SetProtectionEnabled(enabled bool) {
 		a.startProtection()
 	} else {
 		if a.pipeline != nil {
-			a.pipeline.Stop()
+			a.pipeline.Close()
+			a.pipeline = nil
 		}
 	}
 	a.cfg.ProtectionEnabled = enabled
@@ -189,6 +188,12 @@ func (a *App) GetDatabaseInfo() map[string]interface{} {
 // --- Internal helpers ---
 
 func (a *App) startProtection() {
+	// Close any existing pipeline first (closes old WinDivert handle)
+	if a.pipeline != nil {
+		a.pipeline.Close()
+		a.pipeline = nil
+	}
+
 	db := a.db.Load()
 	workerCount := a.cfg.WorkerCount
 	if workerCount <= 0 {

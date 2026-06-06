@@ -1,6 +1,7 @@
 # ─── Binaries ─────────────────────────────────────────
 *.exe
 *.exe~
+*.syso
 *.dll
 !WinDivert.dll
 *.so

@@ -30,6 +30,11 @@ func (p *Pipeline) Stop() {
 	p.started = false
 }
 
+// Close is a no-op in stub mode.
+func (p *Pipeline) Close() {
+	p.started = false
+}
+
 // IsRunning returns the started state.
 func (p *Pipeline) IsRunning() bool {
 	return p.started

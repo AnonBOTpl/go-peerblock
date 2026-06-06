@@ -59,6 +59,11 @@ Wszystkie istotne zmiany w projekcie są dokumentowane w tym pliku.
 - Uptime: zmiana z `time.Time` na `int64` (UnixNano) dla czystej serializacji JSON
 
 ### Naprawiono
+- Nieskończona pętla WinDivert: dodano sprawdzanie flagi Impostor — reinjektowane pakiety pomijają pipeline (przerywa pętlę przechwytywania, przywraca internet)
+- Wyciek uchwytu WinDivert: `ToggleProtection` i `SetProtectionEnabled` używają `Close()` zamiast `Stop()`, poprawnie zamykając uchwyt
+- Wyciek gorutyn pipeline: worker/sendLoop używają `select` z `<-p.done` do czystego zamykania
+- `startProtection()`: zamyka istniejący pipeline przed utworzeniem nowego (zapobiega duplikacji uchwytów WinDivert)
+- `isAdmin()`: usunięto błędne `os.IsPermission(err)` które fałszywie raportowało nie-adminów jako adminów
 - Build CGO: downgrade mingw-w64 do 13.2.0 (w 16.1.0 brakowało `stddef.h`)
 - Bindingi TypeScript: naprawione importy z namespace'ów dla `filter.Stats` i `logger.LogEntry`
 

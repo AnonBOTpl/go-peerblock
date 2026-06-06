@@ -78,8 +78,9 @@ func checkAdminAndDriver() error {
 func isAdmin() bool {
 	// On Windows, this checks if the process has elevated token.
 	// Simplified check: try to access a protected path.
+	// os.IsPermission(err) = ACCESS_DENIED = NOT admin, so we only check err == nil.
 	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
-	return err == nil || os.IsPermission(err)
+	return err == nil
 }
 
 // isDriverLoaded checks if a Windows service/driver is loaded.
