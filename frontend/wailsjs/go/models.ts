@@ -123,6 +123,8 @@ export namespace updater {
 	    url: string;
 	    format: number;
 	    enabled: boolean;
+	    api_key: string;
+	    description: string;
 	    // Go type: time
 	    last_sync: any;
 	
@@ -136,6 +138,8 @@ export namespace updater {
 	        this.url = source["url"];
 	        this.format = source["format"];
 	        this.enabled = source["enabled"];
+	        this.api_key = source["api_key"];
+	        this.description = source["description"];
 	        this.last_sync = this.convertValues(source["last_sync"], null);
 	    }
 	

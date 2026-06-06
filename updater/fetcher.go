@@ -42,7 +42,7 @@ func (f *Fetcher) Fetch(src Source) ([]byte, error) {
 		if i > 0 {
 			time.Sleep(f.backoff * time.Duration(i))
 		}
-		data, err := f.fetchOnce(src.URL)
+		data, err := f.fetchOnce(src.URL, src.APIKey)
 		if err == nil {
 			f.saveToCache(src.Name, data)
 			return data, nil
@@ -55,12 +55,15 @@ func (f *Fetcher) Fetch(src Source) ([]byte, error) {
 	return nil, fmt.Errorf("fetch failed after %d retries: %w", f.maxRetry, lastErr)
 }
 
-func (f *Fetcher) fetchOnce(url string) ([]byte, error) {
+func (f *Fetcher) fetchOnce(url, apiKey string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "go-peerblock/0.1")
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
 
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -69,7 +72,7 @@ func (f *Fetcher) fetchOnce(url string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
 	}
 
 	data, err := io.ReadAll(resp.Body)

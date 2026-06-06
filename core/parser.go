@@ -116,6 +116,18 @@ func parseCIDR(data []byte) ([]IPRange, error) {
 				continue
 			}
 		}
+		// Handle bare IP (no /mask) as /32 — common in Emerging Threats, Blocklist.de, DShield
+		if !strings.Contains(line, "/") {
+			ip := net.ParseIP(line)
+			if ip != nil && ip.To4() != nil {
+				r := IPRange{
+					Start: IPToUint32(ip),
+					End:   IPToUint32(ip),
+				}
+				ranges = append(ranges, r)
+			}
+			continue
+		}
 		r, err := CIDRToRange(line)
 		if err != nil {
 			continue
