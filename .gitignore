@@ -1,0 +1,50 @@
+# ─── Binaries ─────────────────────────────────────────
+*.exe
+*.exe~
+*.dll
+!WinDivert.dll
+*.so
+*.dylib
+*.sys
+!WinDivert64.sys
+
+# ─── Build output ─────────────────────────────────────
+build/bin/
+frontend/dist/
+
+# ─── Dependencies ─────────────────────────────────────
+node_modules/
+vendor/
+
+# ─── Test artifacts ───────────────────────────────────
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# ─── Go ───────────────────────────────────────────────
+go.work
+go.work.sum
+
+# ─── Runtime data ────────────────────────────────────
+data/lists/
+logs/
+*.log
+
+# ─── Downloaded SDK archives ─────────────────────────
+WinDivert-*.zip
+WinDivert-*/
+
+# ─── OS ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE/Editor ───────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ─── Env ──────────────────────────────────────────────
+.env

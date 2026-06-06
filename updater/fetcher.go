@@ -1,0 +1,88 @@
+package updater
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// Fetcher downloads IP blocklist data with retry and disk cache fallback.
+type Fetcher struct {
+	client   *http.Client
+	cacheDir string
+	maxRetry int
+	backoff  time.Duration
+}
+
+// NewFetcher creates a new Fetcher.
+func NewFetcher(cacheDir string) *Fetcher {
+	return &Fetcher{
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		cacheDir: cacheDir,
+		maxRetry: 3,
+		backoff:  5 * time.Second,
+	}
+}
+
+// Fetch downloads data from a source, with retry and fallback to cache.
+func (f *Fetcher) Fetch(src Source) ([]byte, error) {
+	var lastErr error
+	for i := 0; i < f.maxRetry; i++ {
+		if i > 0 {
+			time.Sleep(f.backoff * time.Duration(i))
+		}
+		data, err := f.fetchOnce(src.URL)
+		if err == nil {
+			f.saveToCache(src.Name, data)
+			return data, nil
+		}
+		lastErr = err
+	}
+	if cached, err := f.loadFromCache(src.Name); err == nil {
+		return cached, nil
+	}
+	return nil, fmt.Errorf("fetch failed after %d retries: %w", f.maxRetry, lastErr)
+}
+
+func (f *Fetcher) fetchOnce(url string) ([]byte, error) {
+	resp, err := f.client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty response")
+	}
+	return data, nil
+}
+
+func (f *Fetcher) saveToCache(name string, data []byte) {
+	if f.cacheDir == "" {
+		return
+	}
+	_ = os.MkdirAll(f.cacheDir, 0755)
+	path := filepath.Join(f.cacheDir, name+".cache")
+	_ = os.WriteFile(path, data, 0644)
+}
+
+func (f *Fetcher) loadFromCache(name string) ([]byte, error) {
+	if f.cacheDir == "" {
+		return nil, fmt.Errorf("cache dir not set")
+	}
+	path := filepath.Join(f.cacheDir, name+".cache")
+	return os.ReadFile(path)
+}
