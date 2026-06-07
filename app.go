@@ -14,6 +14,7 @@ import (
 	"go-peerblock/updater"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/sys/windows/registry"
 )
 
 // App is the main application struct, binding Go methods to the Wails frontend.
@@ -59,6 +60,9 @@ func (a *App) startup(ctx context.Context) {
 	a.logger = logger
 	a.logger.Info("go-peerblock uruchomiony")
 
+	// Apply autostart setting (sync config state to registry)
+	a.applyAutostart()
+
 	// Initialize IP database (empty initially)
 	db := core.NewDatabase(nil)
 	a.db.Store(db)
@@ -80,9 +84,8 @@ func (a *App) startup(ctx context.Context) {
 	a.updater = updater.NewUpdater(cfg.Sources, fetcher,
 		func(newDB *core.IPDatabase) {
 			// Clear before Store to prevent workers from caching old DB results
-			a.cache.Clear()
-			a.db.Store(newDB)
-			a.cache.Clear() // Extra safety: clear any entries cached between the two clears
+		a.cache.Clear() // O(1) version increment — stale entries become invisible
+		a.db.Store(newDB)
 			// Sync LastSync from updater back to config so GUI sees correct dates
 			if upSources := a.updater.GetSources(); len(upSources) > 0 {
 				for i := range a.cfg.Sources {
@@ -200,6 +203,7 @@ func (a *App) SaveConfig(cfg config.Config) error {
 	if a.updater != nil {
 		a.updater.RefreshSources(cfg.Sources)
 	}
+	a.applyAutostart()
 	return a.configP.Save(a.cfg)
 }
 
@@ -228,6 +232,14 @@ func (a *App) GetCacheInfo() map[string]interface{} {
 		"entries": a.cache.Len(),
 		"max":     a.cfg.CacheSize,
 	}
+}
+
+// ResetAllowlist resets the allowlist to the default values and saves config.
+func (a *App) ResetAllowlist() error {
+	defaults := config.Defaults()
+	a.cfg.Allowlist = defaults.Allowlist
+	a.allowlist = core.NewAllowlist(a.cfg.Allowlist)
+	return a.configP.Save(a.cfg)
 }
 
 // MinimizeToTray hides the application window to the system tray.
@@ -275,6 +287,37 @@ func (a *App) startProtection() {
 	})
 	a.pipeline.Start()
 	a.logger.Info("Ochrona włączona (%d workerów)", workerCount)
+}
+
+// applyAutostart syncs the StartWithSystem config setting to the Windows registry.
+// HKCU\Software\Microsoft\Windows\CurrentVersion\Run\go-peerblock
+func (a *App) applyAutostart() {
+	keyPath := `Software\Microsoft\Windows\CurrentVersion\Run`
+	k, err := registry.OpenKey(registry.CURRENT_USER, keyPath, registry.SET_VALUE|registry.QUERY_VALUE)
+	if err != nil {
+		a.logger.Error("Nie można otworzyć klucza rejestru autostart: %v", err)
+		return
+	}
+	defer k.Close()
+
+	if a.cfg.StartWithSystem {
+		exePath, err := os.Executable()
+		if err != nil {
+			a.logger.Error("Nie można pobrać ścieżki exe dla autostart: %v", err)
+			return
+		}
+		if err := k.SetStringValue("go-peerblock", exePath); err != nil {
+			a.logger.Error("Nie można ustawić autostart w rejestrze: %v", err)
+		} else {
+			a.logger.Info("Autostart włączony: %s", exePath)
+		}
+	} else {
+		if err := k.DeleteValue("go-peerblock"); err != nil && err != registry.ErrNotExist {
+			a.logger.Error("Nie można usunąć autostart z rejestru: %v", err)
+		} else {
+			a.logger.Info("Autostart wyłączony")
+		}
+	}
 }
 
 func getAppDataDir() string {

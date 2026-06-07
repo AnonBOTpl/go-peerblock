@@ -191,31 +191,17 @@ func (p *Pipeline) sendLoop() {
 }
 
 func (p *Pipeline) shouldBlock(pkt Packet) bool {
-	// Only check destination IP against allowlist — source IP is the user's local IP
+	// Only check destination IP — source IP is the user's local IP
 	// (e.g. 192.168.x.x, 172.16.x.x, 10.x.x.x) and was never meant to bypass blocking.
 	if p.allowlist.Contains(pkt.DstIP) {
 		return false
 	}
 
-	// Only check destination IP against the DB — checking source IP would block
-	// ALL traffic if the user's private IP happens to be in a blocklist range
-	// (e.g. firehol-level1 includes 172.16.0.0/12, 10.0.0.0/8).
 	ip := pkt.DstIP
 	if blocked, ok := p.cache.Get(ip); ok {
-		if blocked {
-			// Re-verify with current DB — guards against stale cache entries
-			// caused by a race: worker loads old DB before Store+Clear, then
-			// caches "blocked" from old DB after both clears.
-			db := p.db.Load()
-			if db == nil || !db.Contains(ip) {
-				// DB was updated — this IP is no longer blocked
-				p.cache.Set(ip, false)
-				return false
-			}
-			return true
-		}
-		return false
+		return blocked
 	}
+
 	db := p.db.Load()
 	if db == nil {
 		return false

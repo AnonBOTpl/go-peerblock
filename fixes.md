@@ -62,19 +62,25 @@ Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów 
 
 ## 📋 Audyt — co jeszcze można zrobić
 
+### ✅ Zrobione w poprzednich sesjach
+
+| LP | Co | Uwagi |
+|---|---|---|
+| A3 | **✅ Minimalizacja do tray** | Przycisk ⬇ w headerze, systray w goroutine okno żyje gdy ukryte. Zrobione. |
+| A4 | **✅ Panel ustawień GUI** | Zakładka Settings z edytorem allowlisty, workerów, cache, TTL, interwału, log level. Zrobione. |
+| A14 | **✅ `appCtx` global usunięty** | Brak globalnych zmiennych w main.go. Zrobione. |
+
 ### 🔴 Krytyczne — brakujące funkcje
 
 | LP | Co | Opis | Plik |
 |---|---|---|---|
 | A1 | **Instalator NSIS** | `build/installer/installer.nsis` nie istnieje. Plan opisuje pełny instalator z WebView2 bootstrapem i obsługą drivera | nowy plik |
 | A2 | **Autostart z systemem** | `Config.StartWithSystem` istnieje, ale brak implementacji (rejestr Windows) | app.go |
-| A3 | **Minimalizacja do tray** | Zamknięcie okna (X) zamyka aplikację. Powinno chować do systray | main.go / app.go |
 
 ### 🟠 Poważne — warte dodania
 
 | LP | Co | Opis | Plik |
 |---|---|---|---|
-| A4 | **Panel ustawień GUI** | UI do edycji: allowlisty, liczby workerów, rozmiaru cache, interwału aktualizacji | frontend/App.tsx |
 | A5 | **Wydzielenie komponentów React** | Dashboard, LogView, SourcesView, AddSourceDialog — każdy osobny plik | frontend/src/ |
 | A6 | **Pakiety na sekundę** | Wyświetlanie przepustowości na pasku statusu | frontend/App.tsx |
 | A7 | **Eventy Wails zamiast pollingu** | `runtime.EventsEmit` dla logów i statystyk w czasie rzeczywistym | app.go / App.tsx |
@@ -87,9 +93,8 @@ Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów 
 
 | LP | Co | Opis | Plik |
 |---|---|---|---|
-| A12 | **Podwójny MergeRanges** | `updateAll` woła `MergeRanges`, potem `NewDatabase` wozi go drugi raz — zbędne | updater/updater.go |
+| A12 | **Podwójny MergeRanges** | `updateAll` woła `MergeRanges`, potem `NewDatabase` woła go drugi raz — zbędne | updater/updater.go |
 | A13 | **README nieaktualne** | Wspomina o winutil, iblocklist, starych źródłach | README.md |
-| A14 | **`appCtx` global** | Zmienna globalna w main.go — kod smell | main.go |
 
 ### 🟢 Koncepcyjne
 
@@ -107,8 +112,9 @@ Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów 
 | Status | Liczba |
 |---|---|
 | ✅ Fixy wykonane | **20** |
+| ✅ Z audytu zrobione | **3** (A3, A4, A14) |
 | ❌ Nie dotyczy | 1 (#13) |
-| 🔴 Brakujące funkcje | **3** (A1–A3) |
-| 🟠 Warte dodania | **8** (A4–A11) |
-| 🟡 Drobne poprawki | **3** (A12–A14) |
+| 🔴 Brakujące funkcje | **2** (A1–A2) |
+| 🟠 Warte dodania | **7** (A5–A11) |
+| 🟡 Drobne poprawki | **2** (A12–A13) |
 | 🟢 Koncepcyjne | **4** (A15–A18) |

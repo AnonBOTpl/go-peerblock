@@ -34,6 +34,10 @@ export function MinimizeToTray() {
   return window['go']['main']['App']['MinimizeToTray']();
 }
 
+export function ResetAllowlist() {
+  return window['go']['main']['App']['ResetAllowlist']();
+}
+
 export function SaveConfig(arg1) {
   return window['go']['main']['App']['SaveConfig'](arg1);
 }

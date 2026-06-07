@@ -4,6 +4,66 @@ All notable changes to this project will be documented in this file.
 
 > 🇵🇱 [Polska wersja](CHANGELOG.pl.md)
 
+## [0.2.0] — 2026-06-07
+
+### Fixed
+
+#### 🔴 Critical — SrcIP blocking everything
+- `filter/pipeline.go`: `shouldBlock` was checking **both SrcIP and DstIP** against the DB. The user's local IP (172.16.3.206) fell within firehol-level1's `172.16.0.0/12` range, causing **every outgoing packet to be blocked**. Fixed: only DstIP is checked (source IP is the user's local interface, never a malicious target).
+
+#### 🟠 Race conditions & cache poisoning
+- `filter/pipeline.go`: removed re-verification of cached `blocked=true` entries against the DB on every hit — was defeating cache purpose. Replaced with **cache versioning** (see Changed).
+- `app.go`: removed duplicate `cache.Clear()` workaround in `onReload` — no longer needed after versioning.
+
+#### Other fixes
+- `app.go`: `LastSync` now properly synced from updater back to config after each update (GUI showed stale dates).
+- `frontend/App.tsx`: Update buttons in header and SourcesView now share a single `updating` state — no more desync.
+- `filter/pipeline_noop.go`: added missing method signatures to match the windivert build.
+- `main.go`: removed `init()` with `runtime.LockOSThread()` and global `appCtx` — Wails and systray manage threads themselves.
+
+### Changed
+
+#### Cache versioning (O(1) invalidation)
+- `core/cache.go`: `Clear()` now increments an `atomic.Uint64` version counter instead of rebuilding the map (O(n)). Entries with stale versions are ignored by `Get()`. `Set()` stores the current version with each entry.
+- This eliminates the race condition where a worker could cache a decision from the old DB after `Clear()` but before `Store()`.
+
+#### Minimize-to-tray
+- `main.go`: systray now starts in a goroutine **before** `wails.Run()`, keeping the process alive when the window is hidden.
+- `app.go`: added `MinimizeToTray()` → `runtime.WindowHide()`.
+- `systray/tray.go`: "Zamknij" now calls `runtime.Quit(ctx)` before `systray.Quit()` for clean shutdown.
+- `frontend/App.tsx`: ⬇ button in header hides the window to system tray. Restore via tray icon → "Pokaż okno".
+
+#### Autostart with Windows
+- `app.go`: added `applyAutostart()` — writes/deletes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\go-peerblock` using `golang.org/x/sys/windows/registry`.
+- Called on startup and whenever `SaveConfig()` is invoked.
+- `frontend/App.tsx`: new "System" section in Settings with toggle "Uruchamiaj z systemem Windows".
+
+### Added
+
+#### Settings panel (GUI)
+- `frontend/App.tsx`: new **⚙️ Ustawienia** tab with editable fields:
+  - Allowlist (textarea, one entry per line, `#` comments stripped)
+  - Worker count (0 = auto/NumCPU)
+  - Cache size (number of entries)
+  - Cache TTL (in minutes, converts to/from nanoseconds for Go's `time.Duration`)
+  - Update interval (in hours)
+  - Log level (dropdown: DEBUG/INFO/WARN/ERROR)
+  - "Uruchamiaj z systemem Windows" toggle
+  - "Przywróć domyślną allowlistę" button (with confirm dialog)
+
+#### Cache usage indicator
+- `frontend/App.tsx`: new **Cache** stat card on Dashboard showing entries/max (e.g. "128 / 65,536"), styled in subtle slate color.
+- `app.go`: added `GetCacheInfo()` exposing cache entries count and max capacity.
+
+#### Multicast in default allowlist
+- `config/config.go`: added `"224.0.0.0/4"` (multicast: SSDP, mDNS, BitTorrent LPD) to default allowlist.
+
+### Benchmarks
+
+- Cache Clear: **O(1)** instead of O(n) — no measurable allocation cost
+- Cache Get/Set: unchanged (~89ns / ~242ns)
+- Binary search: unchanged (~186ns on 500k ranges)
+
 ## [0.1.0] — 2026-06-06
 
 ### Added

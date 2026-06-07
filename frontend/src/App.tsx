@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
-import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetConfig, SaveConfig, GetCacheInfo, MinimizeToTray } from "../wailsjs/go/main/App";
+import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetConfig, SaveConfig, GetCacheInfo, MinimizeToTray, ResetAllowlist } from "../wailsjs/go/main/App";
 import { config, filter, logger, updater } from "../wailsjs/go/models";
 type Stats = filter.Stats;
 type LogEntry = logger.LogEntry;
@@ -378,6 +378,7 @@ function SettingsView() {
   const [cacheTtl, setCacheTtl] = useState('5');
   const [updateInterval, setUpdateInterval] = useState('24');
   const [logLevel, setLogLevel] = useState('info');
+  const [startWithSystem, setStartWithSystem] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -395,6 +396,7 @@ function SettingsView() {
       const intervalNs = c.update_interval ?? 86400000000000;
       setUpdateInterval(String(Math.round(intervalNs / 3600000000000)));
       setLogLevel(c.log_level || 'info');
+      setStartWithSystem(!!c.start_with_system);
     } catch (err) {
       console.error('load config error', err);
     }
@@ -432,6 +434,7 @@ function SettingsView() {
         cache_ttl: ttl * 60000000000, // minutes → nanoseconds
         update_interval: interval * 3600000000000, // hours → nanoseconds
         log_level: logLevel,
+        start_with_system: startWithSystem,
       });
       await SaveConfig(updated);
       setCfg(updated);
@@ -529,6 +532,24 @@ function SettingsView() {
       </div>
 
       <div className="settings-section">
+        <h3>System</h3>
+        <div className="settings-row">
+          <span className="settings-label">Uruchamianie</span>
+          <label className="settings-checkbox-label source-toggle">
+            <input
+              type="checkbox"
+              checked={startWithSystem}
+              onChange={e => setStartWithSystem(e.target.checked)}
+            />
+            <span className="toggle-track">
+              <span className="toggle-indicator" />
+            </span>
+            <span>Uruchamiaj z systemem Windows</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="settings-section">
         <h3>Logowanie</h3>
         <div className="settings-row">
           <span className="settings-label">Poziom logowania <code>log_level</code></span>
@@ -548,6 +569,20 @@ function SettingsView() {
       <div className="settings-actions">
         <button className="btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? '⏳ Zapisywanie...' : '💾 Zapisz ustawienia'}
+        </button>
+        <button className="btn-secondary reset-btn" onClick={async () => {
+          if (!confirm('Czy na pewno chcesz przywrócić domyślną allowlistę? Twoje własne wpisy zostaną usunięte.')) return;
+          try {
+            await ResetAllowlist();
+            await loadConfig();
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+          } catch (e) {
+            setError('Reset allowlisty nie powiódł się');
+            setTimeout(() => setError(''), 5000);
+          }
+        }}>
+          Przywróć domyślną allowlistę
         </button>
         {saved && <span className="settings-saved">✅ Zapisano!</span>}
         {error && <span className="settings-error">{error}</span>}

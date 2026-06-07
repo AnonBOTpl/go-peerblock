@@ -141,11 +141,44 @@ func TestCache_Clear(t *testing.T) {
 	c.Set(2, false)
 	c.Clear()
 
-	if c.Len() != 0 {
-		t.Errorf("expected empty cache after clear, got %d", c.Len())
-	}
+	// After Clear() entries are invisible (different version), but map is not cleared
 	if _, ok := c.Get(1); ok {
-		t.Error("expected no entry after clear")
+		t.Error("expected no entry visible after Clear()")
+	}
+	if _, ok := c.Get(2); ok {
+		t.Error("expected no entry visible after Clear()")
+	}
+
+	// New entries after Clear() work normally
+	c.Set(3, true)
+	blocked, ok := c.Get(3)
+	if !ok {
+		t.Error("expected new entry to be visible after Clear()")
+	}
+	if !blocked {
+		t.Error("expected blocked=true for new entry")
+	}
+}
+
+func TestCache_ClearVersioning(t *testing.T) {
+	c := NewDecisionCache(100, 5*time.Minute)
+
+	c.Set(1, true)
+	c.Clear()
+
+	// Stale entry invisible after Clear()
+	if _, ok := c.Get(1); ok {
+		t.Error("expected stale entry to be invisible after Clear()")
+	}
+
+	// New entry after Clear() works normally
+	c.Set(1, false)
+	blocked, ok := c.Get(1)
+	if !ok {
+		t.Error("expected new entry to be visible after Clear()")
+	}
+	if blocked {
+		t.Error("expected blocked=false for new entry")
 	}
 }
 
