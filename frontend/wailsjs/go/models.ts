@@ -127,6 +127,7 @@ export namespace updater {
 	    description: string;
 	    // Go type: time
 	    last_sync: any;
+	    range_count: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Source(source);
@@ -141,6 +142,7 @@ export namespace updater {
 	        this.api_key = source["api_key"];
 	        this.description = source["description"];
 	        this.last_sync = this.convertValues(source["last_sync"], null);
+	        this.range_count = source["range_count"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

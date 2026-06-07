@@ -1,6 +1,6 @@
-# go-peerblock — Stan projektu (czerwiec 2026)
+# go-peerblock — Plan rozwoju
 
-Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów oraz plan dalszego rozwoju.
+> **Stan:** Stabilny. Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów, audyt oraz pomysły na przyszłość.
 
 ---
 
@@ -8,55 +8,40 @@ Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów 
 
 ### 🔴 Krytyczne (5)
 
-| # | Problem | Fix | Plik |
-|---|---|---|---|
-| 1 | Race condition w stats — `atomic.Value` z `Load+modify+Store` |
-| 2 | `isDriverLoaded` zawsze zwracało `false` |
-| 3 | `installDriver` ignorowało błędy |
-| 17 | **Updater nie widzi źródeł dodanych przez GUI** — `SaveConfig` nie przekazywał nowych źródeł do updatera |
-| 19 | **🔴 SrcIP w DB blokował WSZYSTKO** — `shouldBlock` sprawdzało SrcIP w bazie. Użytkownik ma `172.16.3.206`, firehol-level1 ma `172.16.0.0/12` → każdy pakiet blokowany |
+- [x] **#1** Race condition w stats — `atomic.Value` z `Load+modify+Store`
+- [x] **#2** `isDriverLoaded` zawsze zwracało `false`
+- [x] **#3** `installDriver` ignorowało błędy
+- [x] **#17** Updater nie widzi źródeł dodanych przez GUI — `SaveConfig` nie przekazywał nowych źródeł do updatera
+- [x] **#19** SrcIP w DB blokował WSZYSTKO — `shouldBlock` sprawdzało SrcIP w bazie. Użytkownik ma `172.16.3.206`, firehol-level1 ma `172.16.0.0/12` → każdy pakiet blokowany
 
 ### 🟠 Poważne (5)
 
-| # | Problem | Fix | Plik |
-|---|---|---|---|
-| 4 | `updateAll` trzymało lock podczas I/O sieciowego |
-| 5 | Allowlist niesortowany — binary search działał losowo |
-| 6 | Ignorowany błąd `logger.Close()` w shutdown |
-| 7 | Magic number dla CacheTTL |
-| 18 | Cache zatruty po zmianie bazy — double-clear |
+- [x] **#4** `updateAll` trzymało lock podczas I/O sieciowego
+- [x] **#5** Allowlist niesortowany — binary search działał losowo
+- [x] **#6** Ignorowany błąd `logger.Close()` w shutdown
+- [x] **#7** Magic number dla CacheTTL
+- [x] **#18** Cache zatruty po zmianie bazy — double-clear
 
 ### 🟡 Umiarkowane (5)
 
-| # | Problem | Fix | Plik |
-|---|---|---|---|
-| 8 | Pipeline nie widzi nowej bazy po aktualizacji |
-| 9 | Blokujący `Recv` bez timeoutu |
-| 10 | Format detektor — false positive dla P2P vs CIDR |
-| 11 | `RingBuffer.Len()` było O(n) |
-| 12 | Niezgodna sygnatura `Open` w noop (`int32` vs `interface{}`) |
-| 20 | Race condition w shouldBlock — cache "blocked" po Clear |
+- [x] **#8** Pipeline nie widzi nowej bazy po aktualizacji
+- [x] **#9** Blokujący `Recv` bez timeoutu
+- [x] **#10** Format detektor — false positive dla P2P vs CIDR
+- [x] **#11** `RingBuffer.Len()` było O(n)
+- [x] **#12** Niezgodna sygnatura `Open` w noop (`int32` vs `interface{}`)
+- [x] **#20** Race condition w shouldBlock — cache "blocked" po Clear
 
 ### 🟢 Drobne (4)
 
-| # | Problem | Fix | Plik |
-|---|---|---|---|
-| 14 | Magic int (`3`) zamiast `int(core.FormatCIDR)` w sources.go |
-| 15 | `done` channel w allowlist nigdy nie zamykany |
-| 21 | `LastSync` nie ustawiany po aktualizacji — GUI pokazywało "1.01.1" |
-| 22 | Przyciski Aktualizuj z niezależnymi stanami `updating` |
+- [x] **#14** Magic int (`3`) zamiast `int(core.FormatCIDR)` w sources.go
+- [x] **#15** `done` channel w allowlist nigdy nie zamykany
+- [x] **#21** `LastSync` nie ustawiany po aktualizacji — GUI pokazywało "1.01.1"
+- [x] **#22** Przyciski Aktualizuj z niezależnymi stanami `updating`
 
-### ❌ Nie dotyczy (1)
+### ❌ Nie dotyczy / OK
 
-| # | Problem | Werdykt |
-|---|---|---|
-| 13 | `go.mod` deklaruje `go 1.26.4` | **OK** — Go 1.26.4 istnieje (wydany 2 czerwca 2026) ✅ |
-
-### ✅ Od początku OK (1)
-
-| # | Problem | Werdykt |
-|---|---|---|
-| 16 | `go.sum` w .gitignore | Nie ma go w .gitignore ✅ |
+- [x] **#13** `go.mod` deklaruje `go 1.26.4` — OK, istnieje (wydany 2 czerwca 2026)
+- [x] **#16** `go.sum` w .gitignore — nie ma go w .gitignore ✅
 
 ---
 
@@ -64,57 +49,67 @@ Wszystkie krytyczne błędy naprawione. Poniżej pełna lista wykonanych fixów 
 
 ### ✅ Zrobione w poprzednich sesjach
 
-| LP | Co | Uwagi |
-|---|---|---|
-| A3 | **✅ Minimalizacja do tray** | Przycisk ⬇ w headerze, systray w goroutine okno żyje gdy ukryte. Zrobione. |
-| A4 | **✅ Panel ustawień GUI** | Zakładka Settings z edytorem allowlisty, workerów, cache, TTL, interwału, log level. Zrobione. |
-| A14 | **✅ `appCtx` global usunięty** | Brak globalnych zmiennych w main.go. Zrobione. |
+- [x] **A3** Minimalizacja do tray — przycisk ⬇ w headerze, systray w goroutine, okno żyje gdy ukryte
+- [x] **A4** Panel ustawień GUI — zakładka Settings z edytorem allowlisty, workerów, cache, TTL, interwału, log level
+- [x] **A5** Wydzielenie komponentów React — Dashboard, LogView, SourcesView, AddSourceDialog — każdy osobny plik
+- [x] **A8** Ikona w systray — `systray.SetIcon(iconData)` z własną ikoną użytkownika
+- [x] **A14** `appCtx` global usunięty — brak globalnych zmiennych w main.go
 
-### 🔴 Krytyczne — brakujące funkcje
+### 🔴 Do zrobienia — krytyczne
 
-| LP | Co | Opis | Plik |
-|---|---|---|---|
-| A1 | **Instalator NSIS** | `build/installer/installer.nsis` nie istnieje. Plan opisuje pełny instalator z WebView2 bootstrapem i obsługą drivera | nowy plik |
-| A2 | **Autostart z systemem** | `Config.StartWithSystem` istnieje, ale brak implementacji (rejestr Windows) | app.go |
+- [ ] **A1** Instalator NSIS — `build/installer/installer.nsis` nie istnieje. Pełny instalator z WebView2 bootstrapem i obsługą drivera
+- [ ] **A2** Autostart z systemem — `Config.StartWithSystem` istnieje, ale brak implementacji (rejestr Windows)
 
-### 🟠 Poważne — warte dodania
+### 🟠 Warte dodania
 
-| LP | Co | Opis | Plik |
-|---|---|---|---|
-| A5 | **Wydzielenie komponentów React** | Dashboard, LogView, SourcesView, AddSourceDialog — każdy osobny plik | frontend/src/ |
-| A6 | **Pakiety na sekundę** | Wyświetlanie przepustowości na pasku statusu | frontend/App.tsx |
-| A7 | **Eventy Wails zamiast pollingu** | `runtime.EventsEmit` dla logów i statystyk w czasie rzeczywistym | app.go / App.tsx |
-| A8 | **Ikona w systray** | `systray.SetIcon(iconData)` — zakomentowane, brak pliku .ico | systray/tray.go |
-| A9 | **Testy integracyjne** | `go test -race ./...` — są testy core, brak pipeline/updater/app | filter/, updater/ |
-| A10 | **Rotacja logów** | `LogMaxSizeMB` istnieje, logger nie rotuje plików | logger/logger.go |
-| A11 | **Wykres blokad** | Sparkline ostatnich 60 minut blokad (plan fazy 10) | frontend/App.tsx |
+- [x] **A6** Pakiety na sekundę — wyświetlanie przepustowości na pasku statusu
+- [ ] **A7** Eventy Wails zamiast pollingu — `runtime.EventsEmit` dla logów i statystyk w czasie rzeczywistym
+- [ ] **A9** Testy integracyjne — `go test -race ./...` są testy core, brak pipeline/updater/app
+- [ ] **A10** Rotacja logów — `LogMaxSizeMB` istnieje, logger nie rotuje plików
+- [x] **A11** Wykres blokad — line chart (Chart.js), blokowane vs przepuszczone pakiety/s, przełącznik 5m/10m/30m
+- [ ] **I1** Powiadomienia Windows — toast notification gdy lista się zaktualizuje
+- [ ] **I2** Podgląd źródła blokady — kliknięcie na zablokowany IP w logu pokazuje z której listy pochodzi
+- [x] **I3** Statystyki per lista — ile zakresów pochodzi z FireHOL, ile ze Spamhaus itd., widoczne w zakładce Źródła
 
 ### 🟡 Drobne poprawki
 
-| LP | Co | Opis | Plik |
-|---|---|---|---|
-| A12 | **Podwójny MergeRanges** | `updateAll` woła `MergeRanges`, potem `NewDatabase` woła go drugi raz — zbędne | updater/updater.go |
-| A13 | **README nieaktualne** | Wspomina o winutil, iblocklist, starych źródłach | README.md |
+- [x] **A12** Podwójny MergeRanges — `updateAll` woła `MergeRanges`, potem `NewDatabase` woła go drugi raz — zbędne
+- [ ] **A13** README nieaktualne — wspomina o winutil, iblocklist, starych źródłach
+- [ ] **I4** Harmonogram aktualizacji — opcja "aktualizuj o konkretnej godzinie" (np. 3:00)
+- [ ] **I5** Auto-backup config — kopia `config.json` przed każdą aktualizacją list
 
-### 🟢 Koncepcyjne
+### 🟢 Koncepcyjne / przyszłe
 
-| LP | Co | Opis |
-|---|---|---|
-| A15 | **Tryb "tylko test-blocklist" jednym kliknięciem** | Przycisk "Test" który wyłącza wszystko i włącza test-blocklist |
-| A16 | **Eksport logów do pliku CSV/TXT** | Przycisk "Eksportuj logi" w LogView |
-| A17 | **Statystyki dzienne/tygodniowe** | Podsumowanie blokad w czasie |
-| A18 | **Ciemny/jasny motyw** | Przełącznik motywu |
+- [ ] **A15** Tryb "tylko test-blocklist" — przycisk "Test" który wyłącza wszystko i włącza test-blocklist
+- [ ] **A16** Eksport logów do pliku CSV/TXT — przycisk "Eksportuj logi" w LogView
+- [ ] **A17** Statystyki historyczne z wykresami — liczniki nie resetują się przy restarcie, zapis do pliku, wykres "zablokowanych pakietów w ostatnich 24h/7 dniach"
+- [ ] **A18** Ciemny/jasny motyw — przełącznik motywu
+- [ ] **I6** Tryb nauki — zamiast blokować, przez X minut tylko loguj co by było zablokowane
+- [ ] **I7** Własne reguły użytkownika — plik `custom.txt` gdzie użytkownik wpisuje własne zakresy CIDR
 
 ---
 
-## Podsumowanie
+## 🔮 Integracja z go-dnsblock (plan na przyszłość)
+
+**go-dnsblock** to planowana siostrzana aplikacja — lokalny serwer DNS (DNS sinkhole) blokujący reklamy i złośliwe domeny po nazwie domeny zamiast po IP. Działa podobnie do AdGuard Home / Pi-hole ale jako lekka natywna aplikacja Windows.
+
+- Napisana w Go + Wails
+- Reużywa dużo kodu z go-peerblock (updater, logger, systray, GUI)
+- Plan gotowy, implementacja po ustabilizowaniu go-peerblock
+
+**Wizja:** Docelowo obie aplikacje mogą działać jako jeden pakiet z wspólnym GUI (osobne zakładki: "IP Blocker" i "DNS Blocker").
+
+---
+
+## 📊 Podsumowanie
 
 | Status | Liczba |
 |---|---|
 | ✅ Fixy wykonane | **20** |
-| ✅ Z audytu zrobione | **3** (A3, A4, A14) |
-| ❌ Nie dotyczy | 1 (#13) |
-| 🔴 Brakujące funkcje | **2** (A1–A2) |
-| 🟠 Warte dodania | **7** (A5–A11) |
-| 🟡 Drobne poprawki | **2** (A12–A13) |
-| 🟢 Koncepcyjne | **4** (A15–A18) |
+| ✅ Z audytu zrobione | **9** (A3–A6, A8, A11–A12, A14, I3) |
+| ❌ Nie dotyczy | **2** (#13, #16) |
+| 🔴 Do zrobienia — krytyczne | **2** (A1–A2) |
+| 🟠 Do zrobienia — warte dodania | **5** (A7, A9–A10, I1–I2) |
+| 🟡 Do zrobienia — drobne poprawki | **3** (A13, I4–I5) |
+| 🟢 Koncepcyjne / przyszłe | **6** (A15–A18, I6–I7) |
+| 🔮 go-dnsblock | **1** (integracja future) |

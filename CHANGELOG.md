@@ -4,6 +4,57 @@ All notable changes to this project will be documented in this file.
 
 > 🇵🇱 [Polska wersja](CHANGELOG.pl.md)
 
+## [0.3.0] — 2026-06-07
+
+### Added
+
+#### Charts tab with live line chart
+- `frontend/src/components/ChartsView.tsx` — new **📈 Wykresy** tab with Chart.js line chart showing blocked (red) vs allowed (green) packets/s over time
+- Time range switcher: 5m / 10m / 30m with animated button group
+- Data collection auto-pauses when the tab isn't active (`collectingRef` approach — no wasted CPU)
+- Empty state with "Zbieranie danych..." hint while samples accumulate
+- Tab placed before Settings in navigation
+
+#### Packets-per-second in status bar
+- `frontend/App.tsx` — PPS calculated inline from `stats.started_at` (UnixNano → elapsed seconds), displayed as "Pakiety: X (Y/s)" in the footer
+
+#### Range count per source
+- `updater/sources.go` — `RangeCount int` field tracks how many IP ranges each blocklist contributed
+- `frontend/src/components/SourcesView.tsx` — each source shows a green badge with "X zakresów" after update
+- Value synced back to `u.sources` during the sync-back loop alongside `LastSync`
+
+#### Custom application icon
+- `frontend/src/assets/ikona.png` — 500×500 custom icon replaces placeholder text in header
+- `frontend/index.html` — favicon linked to `ikona.png`
+- `build/appicon.png` — source icon for Wails .exe icon generation
+
+### Changed
+
+#### Tab order
+- Wykresy tab moved before Ustawienia: Dashboard → Źródła → **Wykresy** → Ustawienia
+
+#### Window title
+- `main.go` + `frontend/index.html` — title changed from "go-peerblock" to **"GO PeerBlock - IP Filter"**
+
+#### Merged ideas.md into fixes.md
+- All items from `ideas.md` mapped as I1–I8 into existing audit categories
+- Duplicate entries merged (A17 + I8 → single "Statystyki historyczne")
+
+### Fixed
+
+#### A12 — Double MergeRanges in updater
+- `updater/updater.go`: `updateAll()` was calling `MergeRanges` before `NewDatabase()`, which calls it again internally. Removed the redundant call — now passes `allRanges` directly.
+
+#### Ghost icon in system tray
+- `systray/tray.go`: added `time.Sleep(200ms)` in `onExit()` before `systray.Quit()` — ensures the icon is fully removed from the notification area before the process exits.
+
+#### Systray tooltip consistency
+- `systray/tray.go`: tooltip updated from "go-peerblock - IP Blocker" to **"GO PeerBlock - IP Filter"** matching the window title.
+
+### Dependencies
+
+- Added `chart.js` + `react-chartjs-2` for the Charts tab
+
 ## [0.2.0] — 2026-06-07
 
 ### Fixed

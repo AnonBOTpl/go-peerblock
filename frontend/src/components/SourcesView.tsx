@@ -115,6 +115,9 @@ export function SourcesView({ onUpdate, updating }: SourcesViewProps) {
                       🔑 API
                     </span>
                   )}
+                  {src.range_count > 0 && (
+                    <span className="source-range-count">{src.range_count.toLocaleString()} zakresów</span>
+                  )}
                   {src.last_sync && (
                     <span className="source-last-sync">
                       Ostatnia: {new Date(src.last_sync).toLocaleString('pl-PL')}

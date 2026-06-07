@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import appIcon from './assets/ikona.png';
 import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetCacheInfo, MinimizeToTray } from "../wailsjs/go/main/App";
@@ -7,10 +7,11 @@ import { Dashboard } from './components/Dashboard';
 import { SourcesView } from './components/SourcesView';
 import { SettingsView } from './components/SettingsView';
 import { LogView } from './components/LogView';
+import { ChartsView, type Sample } from './components/ChartsView';
 
 type Stats = filter.Stats;
 type LogEntry = logger.LogEntry;
-type Tab = 'dashboard' | 'sources' | 'settings';
+type Tab = 'dashboard' | 'sources' | 'settings' | 'charts';
 
 // ─── Main App ────────────────────────────────────────────
 
@@ -22,6 +23,10 @@ function App() {
   const [uptime, setUptime] = useState('0s');
   const [tab, setTab] = useState<Tab>('dashboard');
   const [cacheInfo, setCacheInfo] = useState<Record<string, any>>({});
+  const [history, setHistory] = useState<Sample[]>([]);
+  const prevStatsRef = useRef<Stats | null>(null);
+  const prevTimeRef = useRef<number>(0);
+  const collectingRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -35,6 +40,30 @@ function App() {
       setCacheInfo(ci);
       const l = await GetLogs(200);
       setLogs(l);
+
+      // Calculate PPS delta from previous snapshot for the chart (only when tab active)
+      if (collectingRef.current && prevStatsRef.current) {
+        const now = Date.now();
+        const elapsed = (now - prevTimeRef.current) / 1000;
+        if (elapsed >= 0.5) {
+          const blockedDelta = s.blocked - prevStatsRef.current.blocked;
+          const allowedDelta = s.allowed - prevStatsRef.current.allowed;
+          if (blockedDelta >= 0 && allowedDelta >= 0) {
+            setHistory(prev => {
+              const next = [...prev, {
+                time: now,
+                blockedPPS: blockedDelta / elapsed,
+                allowedPPS: allowedDelta / elapsed,
+              }];
+              // Keep max 30 minutes of samples
+              const cutoff = now - 30 * 60 * 1000;
+              return next.filter(h => h.time >= cutoff);
+            });
+          }
+        }
+      }
+      prevStatsRef.current = s;
+      prevTimeRef.current = Date.now();
     } catch (err) {
       console.error('refresh error', err);
     }
@@ -60,6 +89,11 @@ function App() {
     const iv = setInterval(update, 1000);
     return () => clearInterval(iv);
   }, [stats?.started_at]);
+
+  // Pause chart data collection when the tab isn't active
+  useEffect(() => {
+    collectingRef.current = tab === 'charts';
+  }, [tab]);
 
   const handleToggle = async () => {
     await ToggleProtection();
@@ -105,6 +139,10 @@ function App() {
           onClick={() => setTab('sources')}
         >📋 Źródła list IP</button>
         <button
+          className={`tab-btn ${tab === 'charts' ? 'active' : ''}`}
+          onClick={() => setTab('charts')}
+        >📈 Wykresy</button>
+        <button
           className={`tab-btn ${tab === 'settings' ? 'active' : ''}`}
           onClick={() => setTab('settings')}
         >⚙️ Ustawienia</button>
@@ -119,19 +157,27 @@ function App() {
         )}
         {tab === 'sources' && <SourcesView onUpdate={handleUpdate} updating={updating} />}
         {tab === 'settings' && <SettingsView />}
+        {tab === 'charts' && <ChartsView history={history} />}
         <LogView logs={logs} onClear={handleClearLogs} />
       </main>
 
       <footer className="status-bar">
         <span className={`status-dot ${protected_ ? 'active' : 'inactive'}`} />
         <span>{protected_ ? 'Ochrona aktywna' : 'Ochrona wyłączona'}</span>
-        {stats && (
-          <span className="status-fps">
-            Pakiety: {(stats.blocked + stats.allowed).toLocaleString()}
-          </span>
-        )}
+        {stats && (() => {
+          const total = stats.blocked + stats.allowed;
+          const elapsed = stats.started_at > 0
+            ? (Date.now() - Math.floor(stats.started_at / 1_000_000)) / 1000
+            : 0;
+          const pps = elapsed > 0 ? (total / elapsed).toFixed(1) : '0.0';
+          return (
+            <span className="status-fps">
+              Pakiety: {total.toLocaleString()} ({pps}/s)
+            </span>
+          );
+        })()}
         <span className="status-tab">{
-          tab === 'dashboard' ? 'Dashboard' : tab === 'sources' ? 'Źródła' : 'Ustawienia'
+          tab === 'dashboard' ? 'Dashboard' : tab === 'sources' ? 'Źródła' : tab === 'charts' ? 'Wykresy' : 'Ustawienia'
         }</span>
       </footer>
     </div>

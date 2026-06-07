@@ -4,6 +4,57 @@ Wszystkie istotne zmiany w projekcie są dokumentowane w tym pliku.
 
 > 🇬🇧 [English version](CHANGELOG.md)
 
+## [0.3.0] — 2026-06-07
+
+### Dodano
+
+#### Nowa zakładka Wykresy z wykresem liniowym
+- `frontend/src/components/ChartsView.tsx` — nowa zakładka **📈 Wykresy** z wykresem Chart.js: blokowane (🔴) vs przepuszczone (🟢) pakiety/s w czasie
+- Przełącznik zakresu: 5m / 10m / 30m z przyciskami w stylu segmentowym
+- Automatyczna pauza zbierania próbek gdy zakładka nieaktywna — zero zbędnego obciążenia (`collectingRef`)
+- Stan pusty "Zbieranie danych..." dopóki nie zgromadzono 2+ próbek
+- Zakładka umieszczona przed Ustawieniami w nawigacji
+
+#### Pakiety na sekundę na pasku statusu
+- `frontend/App.tsx` — PPS liczone z `stats.started_at`, wyświetlane jako "Pakiety: X (Y/s)" w stopce
+
+#### Statystyki zakresów per źródło
+- `updater/sources.go` — pole `RangeCount int` śledzi ile zakresów IP pochodzi z każdego źródła
+- `frontend/src/components/SourcesView.tsx` — zielona odznaka "X zakresów" przy każdym źródle po aktualizacji
+- Wartość synchronizowana obok `LastSync` w pętli sync-back
+
+#### Własna ikona aplikacji
+- `frontend/src/assets/ikona.png` — własna ikona 500×500 w nagłówku okna zamiast tekstu
+- `frontend/index.html` — favicon podpięty do `ikona.png`
+- `build/appicon.png` — źródło do generowania ikony .exe przez Wails
+
+### Zmieniono
+
+#### Kolejność zakładek
+- Wykresy przesunięte przed Ustawienia: Dashboard → Źródła → **Wykresy** → Ustawienia
+
+#### Tytuł okna
+- `main.go` + `frontend/index.html` — zmiana z "go-peerblock" na **"GO PeerBlock - IP Filter"**
+
+#### Scalono ideas.md z fixes.md
+- Wszystkie pomysły z ideas.md zamapowane jako I1–I8 w odpowiednie kategorie audytu
+- Duplikaty usunięte (A17 + I8 → jeden wpis "Statystyki historyczne")
+
+### Naprawiono
+
+#### A12 — Podwójny MergeRanges w updaterze
+- `updater/updater.go`: `updateAll()` wołało `MergeRanges` przed `NewDatabase()`, która robi to samo wewnętrznie. Usunięto zbędne wołanie.
+
+#### Ghost icon w zasobniku systemowym
+- `systray/tray.go`: dodano `time.Sleep(200ms)` w `onExit()` przed `systray.Quit()` — ikona w tray'u znika całkowicie przed zakończeniem procesu.
+
+#### Tooltip w tray'u
+- `systray/tray.go`: tooltip zaktualizowany z "go-peerblock - IP Blocker" na **"GO PeerBlock - IP Filter"** (spójnie z tytułem okna).
+
+### Zależności
+
+- Dodano `chart.js` + `react-chartjs-2` dla zakładki Wykresy
+
 ## [0.2.0] — 2026-06-07
 
 ### Naprawiono

@@ -15,6 +15,7 @@ type Source struct {
 	APIKey      string    `json:"api_key"`
 	Description string    `json:"description"`
 	LastSync    time.Time `json:"last_sync"`
+	RangeCount  int       `json:"range_count"`
 }
 
 // DefaultSources provides a sensible set of initial sources.

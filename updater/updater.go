@@ -130,6 +130,7 @@ func (u *Updater) updateAll() {
 		}
 		allRanges = append(allRanges, ranges...)
 		sources[i].LastSync = now
+		sources[i].RangeCount = len(ranges)
 		u.logf("Załadowano %d zakresów z %s", len(ranges), src.Name)
 	}
 
@@ -139,16 +140,16 @@ func (u *Updater) updateAll() {
 	for i := range sources {
 		if !sources[i].LastSync.IsZero() && i < len(u.sources) {
 			u.sources[i].LastSync = sources[i].LastSync
+			u.sources[i].RangeCount = sources[i].RangeCount
 		}
 	}
-	merged := core.MergeRanges(allRanges)
-	newDB := core.NewDatabase(merged)
+	newDB := core.NewDatabase(allRanges)
 	u.mu.Unlock()
 
 	if u.onReload != nil {
 		u.onReload(newDB)
 	}
-	u.logf("Baza IP przeładowana: %d zakresów (po merge'u)", len(merged))
+	u.logf("Baza IP przeładowana: %d zakresów (po merge'u)", len(newDB.Ranges()))
 }
 
 func (u *Updater) logf(format string, args ...interface{}) {
