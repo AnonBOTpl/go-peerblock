@@ -11,6 +11,7 @@ export function SettingsView() {
   const [updateInterval, setUpdateInterval] = useState('24');
   const [logLevel, setLogLevel] = useState('info');
   const [startWithSystem, setStartWithSystem] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -28,6 +29,7 @@ export function SettingsView() {
       setUpdateInterval(String(Math.round(intervalNs / 3600000000000)));
       setLogLevel(c.log_level || 'info');
       setStartWithSystem(!!c.start_with_system);
+      setNotificationsEnabled(c.notifications_enabled !== false);
     } catch (err) {
       console.error('load config error', err);
     }
@@ -66,6 +68,7 @@ export function SettingsView() {
         update_interval: interval * 3600000000000,
         log_level: logLevel,
         start_with_system: startWithSystem,
+        notifications_enabled: notificationsEnabled,
       });
       await SaveConfig(updated);
       setCfg(updated);
@@ -193,6 +196,24 @@ export function SettingsView() {
               <span className="toggle-indicator" />
             </span>
             <span>Uruchamiaj z systemem Windows</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>Powiadomienia</h3>
+        <div className="settings-row">
+          <span className="settings-label">Aktualizacje list</span>
+          <label className="settings-checkbox-label source-toggle">
+            <input
+              type="checkbox"
+              checked={notificationsEnabled}
+              onChange={e => setNotificationsEnabled(e.target.checked)}
+            />
+            <span className="toggle-track">
+              <span className="toggle-indicator" />
+            </span>
+            <span>Powiadom o zakończeniu aktualizacji list IP</span>
           </label>
         </div>
       </div>

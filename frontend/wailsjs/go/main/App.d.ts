@@ -19,6 +19,8 @@ export function GetStats():Promise<filter.Stats>;
 
 export function IsProtectionEnabled():Promise<boolean>;
 
+export function LookupBlockSource(arg1:string):Promise<Array<string>>;
+
 export function MinimizeToTray():Promise<void>;
 
 export function ResetAllowlist():Promise<void>;

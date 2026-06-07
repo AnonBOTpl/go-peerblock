@@ -4,6 +4,7 @@ export namespace config {
 	    protection_enabled: boolean;
 	    start_minimized: boolean;
 	    start_with_system: boolean;
+	    notifications_enabled: boolean;
 	    worker_count: number;
 	    cache_size: number;
 	    cache_ttl: number;
@@ -22,6 +23,7 @@ export namespace config {
 	        this.protection_enabled = source["protection_enabled"];
 	        this.start_minimized = source["start_minimized"];
 	        this.start_with_system = source["start_with_system"];
+	        this.notifications_enabled = source["notifications_enabled"];
 	        this.worker_count = source["worker_count"];
 	        this.cache_size = source["cache_size"];
 	        this.cache_ttl = source["cache_ttl"];

@@ -11,12 +11,14 @@ interface LogViewProps {
 export function LogView({ logs, onClear }: LogViewProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [filter_, setFilter_] = useState<string>('ALL');
+  // Poziomy: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+  const [levelFilter, setLevelFilter] = useState<string>('SYSTEM');
 
   const filteredLogs = logs.filter(e => {
-    if (filter_ === 'ALL') return true;
-    if (filter_ === 'BLOCKED') return e.message.includes('BLOCK');
-    if (filter_ === 'ERROR') return e.level >= 3;
+    if (levelFilter === 'ALL') return true;          // wszystko, włączając DEBUG
+    if (levelFilter === 'SYSTEM') return e.level >= 1 && !e.message.startsWith('BLOCK'); // system INFO+ (bez BLOCK)
+    if (levelFilter === 'BLOCKED') return e.message.startsWith('BLOCK');
+    if (levelFilter === 'ERROR') return e.level >= 3;
     return true;
   });
 
@@ -51,8 +53,9 @@ export function LogView({ logs, onClear }: LogViewProps) {
     <div className="log-view">
       <div className="log-toolbar">
         <span className="log-title">Logi zdarzeń</span>
-        <select value={filter_} onChange={e => setFilter_(e.target.value)} className="log-filter">
-          <option value="ALL">Wszystkie</option>
+        <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className="log-filter">
+          <option value="SYSTEM">System (domyślny)</option>
+          <option value="ALL">Wszystkie + DEBUG</option>
           <option value="BLOCKED">Blokady</option>
           <option value="ERROR">Błędy</option>
         </select>

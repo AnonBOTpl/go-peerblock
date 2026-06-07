@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { SourceDialog } from './SourceDialog';
+import { LookupBlockSource } from '../../wailsjs/go/main/App';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -29,8 +31,17 @@ export interface Sample {
   allowedPPS: number;
 }
 
+export interface BlockedEntry {
+  id: number;
+  timestamp: number;
+  srcIP: string;
+  dstIP: string;
+  proto: string;
+}
+
 interface ChartsViewProps {
   history: Sample[];
+  blockedEntries: BlockedEntry[];
 }
 
 type Range = 5 | 10 | 30;
@@ -46,8 +57,16 @@ function formatTime(ts: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function ChartsView({ history }: ChartsViewProps) {
+function formatBlockTime(ts: number): string {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+}
+
+export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
   const [timeRange, setTimeRange] = useState<Range>(5);
+  const [dialogIP, setDialogIP] = useState<string | null>(null);
+  const [dialogSources, setDialogSources] = useState<string[]>([]);
+  const [loadingSource, setLoadingSource] = useState(false);
 
   // Filter history by selected time range
   const filtered = useMemo(() => {
@@ -82,6 +101,24 @@ export function ChartsView({ history }: ChartsViewProps) {
       },
     ],
   }), [filtered]);
+
+  const handleBlockClick = useCallback(async (entry: BlockedEntry) => {
+    setDialogIP(entry.dstIP);
+    setDialogSources([]);
+    setLoadingSource(true);
+    try {
+      const sources = await LookupBlockSource(entry.dstIP);
+      setDialogSources(sources || []);
+    } catch {
+      setDialogSources([]);
+    }
+    setLoadingSource(false);
+  }, []);
+
+  const handleCloseDialog = useCallback(() => {
+    setDialogIP(null);
+    setDialogSources([]);
+  }, []);
 
   const options = {
     responsive: true,
@@ -180,6 +217,46 @@ export function ChartsView({ history }: ChartsViewProps) {
         <div className="chart-container">
           <Line data={data} options={options} />
         </div>
+      )}
+
+      {/* Blocked IPs list */}
+      <div className="blocked-list">
+        <div className="blocked-list-header">
+          <h3>Ostatnie blokady</h3>
+          <span className="blocked-list-count">{blockedEntries.length}</span>
+        </div>
+        {blockedEntries.length === 0 ? (
+          <div className="blocked-list-empty">Brak zablokowanych pakietów. Włącz ochronę aby zobaczyć listę.</div>
+        ) : (
+          <div className="blocked-list-entries">
+            {blockedEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="blocked-entry"
+                  onClick={() => handleBlockClick(entry)}
+                  title="Kliknij aby sprawdzić źródło blokady"
+                >
+                  <span className="blocked-time">{formatBlockTime(entry.timestamp)}</span>
+                  <span className="blocked-ips">
+                    <span className="blocked-src">{entry.srcIP}</span>
+                    <span className="blocked-arrow">→</span>
+                    <span className="blocked-dst">{entry.dstIP}</span>
+                  </span>
+                  <span className="blocked-proto">{entry.proto}</span>
+                  <span className="blocked-lookup-icon">🔍</span>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* Source dialog */}
+      {dialogIP && (
+        <SourceDialog
+          ip={dialogIP}
+          sources={loadingSource ? ['Szukanie źródeł...'] : dialogSources}
+          onClose={handleCloseDialog}
+        />
       )}
     </div>
   );

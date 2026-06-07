@@ -30,6 +30,10 @@ export function IsProtectionEnabled() {
   return window['go']['main']['App']['IsProtectionEnabled']();
 }
 
+export function LookupBlockSource(arg1) {
+  return window['go']['main']['App']['LookupBlockSource'](arg1);
+}
+
 export function MinimizeToTray() {
   return window['go']['main']['App']['MinimizeToTray']();
 }

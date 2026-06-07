@@ -16,6 +16,10 @@
 - **🎨 Modern GUI** — React + TypeScript frontend via Wails v2 (WebView2)
 - **🔄 Auto-updating blocklists** — periodic download and atomic reload of IP lists without packet loss
 - **📊 Real-time statistics** — blocked/allowed counters, uptime, live log viewer
+- **📈 Blocked packets per second chart** — live line chart with 5m/10m/30m zoom
+- **🔍 Block source lookup** — click any blocked IP to see which blocklists contain it
+- **📋 Per-list statistics** — view how many ranges each source contributes in the Sources tab
+- **🔔 Windows toast notifications** — desktop notification when lists finish updating (toggleable)
 - **🔍 Multi-format parser** — supports PeerGuardian (.p2p), eMule DAT, CIDR, and plain range formats
 - **✅ Allowlist support** — DNS-resolveable domain whitelisting
 - **⚙️ Configurable cache** — LRU decision cache with adjustable TTL
@@ -160,9 +164,18 @@ go-peerblock/
 │   └── tray.go              # Tray icon and menu
 ├── frontend/                # React + TypeScript (Wails)
 │   └── src/
-│       ├── App.tsx          # Main dashboard component
+│       ├── App.tsx          # Main app with routing + event handlers
 │       ├── App.css          # Dark theme styling
-│       └── main.tsx         # Entry point
+│       ├── main.tsx         # Entry point
+│       ├── components/
+│       │   ├── DashboardView.tsx   # Stats overview (counters, uptime)
+│       │   ├── ChartsView.tsx      # PPS chart + clickable blocked IP list
+│       │   ├── LogView.tsx         # Filterable system/blocked log viewer
+│       │   ├── SettingsView.tsx    # Full settings panel
+│       │   ├── SourcesView.tsx     # Source management + per-list stats
+│       │   ├── AddSourceDialog.tsx # Dialog to add new blocklist source
+│       │   ├── SourceDialog.tsx    # Block source lookup results modal
+│       │   └── ConfigView.tsx      # Config file viewer
 ├── build/
 │   ├── windows/             # UAC manifest
 │   └── installer/           # NSIS installer + driver script

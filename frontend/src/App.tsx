@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import appIcon from './assets/ikona.png';
-import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetCacheInfo, MinimizeToTray } from "../wailsjs/go/main/App";
+import { GetStats, GetLogs, GetConfig, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetCacheInfo, MinimizeToTray } from "../wailsjs/go/main/App";
+import { EventsOn, InitializeNotifications, SendNotification, CleanupNotifications } from '../wailsjs/runtime/runtime';
 import { filter, logger } from "../wailsjs/go/models";
 import { Dashboard } from './components/Dashboard';
 import { SourcesView } from './components/SourcesView';
 import { SettingsView } from './components/SettingsView';
 import { LogView } from './components/LogView';
-import { ChartsView, type Sample } from './components/ChartsView';
+import { ChartsView, type Sample, type BlockedEntry } from './components/ChartsView';
 
 type Stats = filter.Stats;
 type LogEntry = logger.LogEntry;
@@ -24,9 +25,13 @@ function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [cacheInfo, setCacheInfo] = useState<Record<string, any>>({});
   const [history, setHistory] = useState<Sample[]>([]);
+  const [blockedEntries, setBlockedEntries] = useState<BlockedEntry[]>([]);
+  const blockIdRef = useRef(0);
   const prevStatsRef = useRef<Stats | null>(null);
   const prevTimeRef = useRef<number>(0);
   const collectingRef = useRef(false);
+  // Pomija pierwszy event update-status (startowy), żeby nie wysyłać toasta przy starcie
+  const startupRef = useRef(true);
 
   const refresh = useCallback(async () => {
     try {
@@ -39,9 +44,24 @@ function App() {
       const ci = await GetCacheInfo();
       setCacheInfo(ci);
       const l = await GetLogs(200);
-      setLogs(l);
+      setLogs(l.reverse()); // newest first, matching event prepend
+    } catch (err) {
+      console.error('refresh error', err);
+    }
+  }, []);
 
-      // Calculate PPS delta from previous snapshot for the chart (only when tab active)
+  useEffect(() => {
+    // Initial data fetch
+    refresh();
+
+    // Initialize Windows toast notifications
+    InitializeNotifications().catch(() => {});
+
+    // Live event listeners — replaces 2s polling (A7)
+    const cancelStats = EventsOn("stats", (s: Stats) => {
+      setStats(s);
+
+      // Calculate PPS delta for chart history
       if (collectingRef.current && prevStatsRef.current) {
         const now = Date.now();
         const elapsed = (now - prevTimeRef.current) / 1000;
@@ -55,7 +75,6 @@ function App() {
                 blockedPPS: blockedDelta / elapsed,
                 allowedPPS: allowedDelta / elapsed,
               }];
-              // Keep max 30 minutes of samples
               const cutoff = now - 30 * 60 * 1000;
               return next.filter(h => h.time >= cutoff);
             });
@@ -64,15 +83,68 @@ function App() {
       }
       prevStatsRef.current = s;
       prevTimeRef.current = Date.now();
-    } catch (err) {
-      console.error('refresh error', err);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, 2000);
-    return () => clearInterval(interval);
+    const cancelLog = EventsOn("log", (entry: LogEntry) => {
+      setLogs(prev => {
+        const next = [entry, ...prev];
+        return next.length > 200 ? next.slice(0, 200) : next;
+      });
+      // Split BLOCK messages into separate list for ChartsView
+      if (entry.message.startsWith('BLOCK')) {
+        const m = entry.message.match(/^BLOCK (\S+) → (\S+) \[(\w+)\]$/);
+        if (m) {
+          const id = ++blockIdRef.current;
+          setBlockedEntries(prev => {
+            const next = [{ id, timestamp: Date.now(), srcIP: m[1], dstIP: m[2], proto: m[3] }, ...prev];
+            return next.length > 500 ? next.slice(0, 500) : next;
+          });
+        }
+      }
+    });
+
+    const cancelProtection = EventsOn("protection", (enabled: boolean) => {
+      setProtected_(enabled);
+    });
+
+    const cancelDbInfo = EventsOn("db-info", (info: Record<string, any>) => {
+      setDbInfo(info);
+    });
+
+    const cancelCacheInfo = EventsOn("cache-info", (info: Record<string, any>) => {
+      setCacheInfo(info);
+    });
+
+    const cancelUpdateStatus = EventsOn("update-status", async (data: any) => {
+      setUpdating(false);
+      // Skip the first event (startup update) — nie wysyłamy toasta przy starcie
+      if (startupRef.current) {
+        startupRef.current = false;
+        return;
+      }
+      if (!data?.ranges) return;
+      // Sprawdź aktualne ustawienie z configu (SettingsView mogło je zmienić)
+      try {
+        const cfg = await GetConfig();
+        if (cfg.notifications_enabled !== false) {
+          await SendNotification({
+            id: 'update-complete',
+            title: 'GO PeerBlock',
+            body: `Listy IP zaktualizowane: ${data.ranges.toLocaleString()} zakresów`,
+          });
+        }
+      } catch {}
+    });
+
+    return () => {
+      cancelStats();
+      cancelLog();
+      cancelProtection();
+      cancelDbInfo();
+      cancelCacheInfo();
+      cancelUpdateStatus();
+      CleanupNotifications().catch(() => {});
+    };
   }, [refresh]);
 
   useEffect(() => {
@@ -105,11 +177,13 @@ function App() {
   const handleUpdate = async () => {
     setUpdating(true);
     await TriggerUpdate();
-    setTimeout(() => setUpdating(false), 3000);
+    // Safety timeout: odblokuj przycisk po 60s nawet jeśli event nie przyjdzie (np. Go padnie)
+    setTimeout(() => setUpdating(false), 60_000);
   };
 
   const handleClearLogs = () => {
     setLogs([]);
+    setBlockedEntries([]);
   };
 
   return (
@@ -157,7 +231,7 @@ function App() {
         )}
         {tab === 'sources' && <SourcesView onUpdate={handleUpdate} updating={updating} />}
         {tab === 'settings' && <SettingsView />}
-        {tab === 'charts' && <ChartsView history={history} />}
+        {tab === 'charts' && <ChartsView history={history} blockedEntries={blockedEntries} />}
         <LogView logs={logs} onClear={handleClearLogs} />
       </main>
 

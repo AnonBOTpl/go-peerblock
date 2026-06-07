@@ -39,13 +39,20 @@ type LogEntry struct {
 	Message   string    `json:"message"`
 }
 
+// Subscriber receives new log entries in real-time via a channel.
+type subscriber struct {
+	ch chan LogEntry
+}
+
 // Logger provides asynchronous logging to file with a ring buffer for GUI access.
 type Logger struct {
-	ch   chan LogEntry
-	file *os.File
-	ring *RingBuffer
-	done chan struct{}
-	wg   sync.WaitGroup
+	ch          chan LogEntry
+	file        *os.File
+	ring        *RingBuffer
+	done        chan struct{}
+	wg          sync.WaitGroup
+	subscribers []subscriber
+	subMu       sync.Mutex
 }
 
 // NewLogger creates a new async logger writing to the given file path.
@@ -105,6 +112,30 @@ func (l *Logger) Ring() *RingBuffer {
 	return l.ring
 }
 
+// Subscribe returns a channel that receives every new log entry in real-time.
+// The caller should read from the channel promptly; slow readers may miss entries.
+// Call Unsubscribe with the returned channel to stop receiving.
+func (l *Logger) Subscribe() chan LogEntry {
+	ch := make(chan LogEntry, 256)
+	l.subMu.Lock()
+	l.subscribers = append(l.subscribers, subscriber{ch: ch})
+	l.subMu.Unlock()
+	return ch
+}
+
+// Unsubscribe removes a previously subscribed channel.
+func (l *Logger) Unsubscribe(ch chan LogEntry) {
+	l.subMu.Lock()
+	defer l.subMu.Unlock()
+	for i, s := range l.subscribers {
+		if s.ch == ch {
+			l.subscribers = append(l.subscribers[:i], l.subscribers[i+1:]...)
+			close(ch)
+			return
+		}
+	}
+}
+
 // Close shuts down the logger and waits for pending writes.
 func (l *Logger) Close() error {
 	close(l.done)
@@ -123,6 +154,15 @@ func (l *Logger) run() {
 				entry.Level,
 				entry.Message,
 			)
+			// Notify subscribers (non-blocking — drop if slow)
+			l.subMu.Lock()
+			for _, s := range l.subscribers {
+				select {
+				case s.ch <- entry:
+				default:
+				}
+			}
+			l.subMu.Unlock()
 		case <-l.done:
 			// Drain remaining entries
 			for {
@@ -134,6 +174,15 @@ func (l *Logger) run() {
 						entry.Level,
 						entry.Message,
 					)
+					// Notify subscribers during drain too
+					l.subMu.Lock()
+					for _, s := range l.subscribers {
+						select {
+						case s.ch <- entry:
+						default:
+						}
+					}
+					l.subMu.Unlock()
 				default:
 					return
 				}

@@ -1,0 +1,1 @@
+cos jest nie tak bo gdy ma sie wyswietlac co jest blokowane jak bylo wczesniej to w logach pojawia sie to co sie dzieje podczas aktualizacji list. rowniez nie jestem pewiem czy wszystkie listy  zakresow saą ładowane bo zakres pokazuj 35tysiecy  a wedlug list powinno byc ponad 65 tysiecy

@@ -16,6 +16,10 @@
 - **🎨 Nowoczesne GUI** — frontend React + TypeScript przez Wails v2 (WebView2)
 - **🔄 Automatyczne aktualizacje** — okresowe pobieranie i atomowe przeładowanie list IP bez utraty pakietów
 - **📊 Statystyki w czasie rzeczywistym** — liczniki zablokowanych/przepuszczonych, uptime, podgląd logów
+- **📈 Wykres blokad na sekundę** — live line chart z zoomem 5m/10m/30m
+- **🔍 Podgląd źródła blokady** — kliknij na zablokowane IP, by zobaczyć które listy je blokują
+- **📋 Statystyki per lista** — ile zakresów pochodzi z każdego źródła w zakładce Źródła
+- **🔔 Powiadomienia Windows** — toast na pulpicie gdy listy się zaktualizują (można wyłączyć w ustawieniach)
 - **🔍 Parser wielu formatów** — obsługa PeerGuardian (.p2p), eMule DAT, CIDR i zakresów
 - **✅ Allowlista** — whitelistowanie domen z resolwowaniem DNS
 - **⚙️ Konfigurowalny cache** — LRU cache decyzji z regulowanym TTL
@@ -142,6 +146,19 @@ go-peerblock/
 ├── config/                  # Konfiguracja
 ├── systray/                 # System tray
 ├── frontend/                # React + TypeScript
+│   └── src/
+│       ├── App.tsx          # Główna aplikacja z routingiem + event handlerami
+│       ├── App.css          # Motyw ciemny
+│       ├── main.tsx         # Punkt wejścia
+│       ├── components/
+│       │   ├── DashboardView.tsx   # Panel główny (liczniki, uptime)
+│       │   ├── ChartsView.tsx      # Wykres PPS + klikalna lista blokad
+│       │   ├── LogView.tsx         # Podgląd logów z filtrowaniem
+│       │   ├── SettingsView.tsx    # Panel ustawień
+│       │   ├── SourcesView.tsx     # Zarządzanie źródłami + statystyki per lista
+│       │   ├── AddSourceDialog.tsx # Dodawanie nowego źródła
+│       │   ├── SourceDialog.tsx    # Wyniki podglądu źródła blokady
+│       │   └── ConfigView.tsx      # Podgląd pliku konfiguracyjnego
 ├── build/                   # Manifest UAC + instalator NSIS
 └── WinDivert.*              # SDK WinDivert
 ```

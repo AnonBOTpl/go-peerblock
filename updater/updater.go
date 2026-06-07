@@ -24,6 +24,7 @@ type Updater struct {
 	manualTrigger chan struct{}
 	mu            sync.Mutex
 	running       bool
+	sourceRanges  map[string][]core.IPRange
 }
 
 // NewUpdater creates a new Updater.
@@ -41,6 +42,19 @@ func NewUpdater(sources []Source, fetcher *Fetcher, onReload ReloadFunc, logFn L
 	}
 }
 
+// GetSourceRanges returns per-source IP ranges (pre-merge) for source lookup.
+func (u *Updater) GetSourceRanges() map[string][]core.IPRange {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	result := make(map[string][]core.IPRange, len(u.sourceRanges))
+	for name, ranges := range u.sourceRanges {
+		cpy := make([]core.IPRange, len(ranges))
+		copy(cpy, ranges)
+		result[name] = cpy
+	}
+	return result
+}
+
 // Run starts the update loop. Blocks until ctx is cancelled.
 func (u *Updater) Run(ctx context.Context) {
 	u.mu.Lock()
@@ -53,8 +67,8 @@ func (u *Updater) Run(ctx context.Context) {
 		u.mu.Unlock()
 	}()
 
-	u.logf("Rozpoczynam aktualizację list IP...")
-	u.updateAll()
+	// Pierwsza aktualizacja przy starcie — cicha (nie zaśmieca logów)
+	u.updateAll(true)
 
 	ticker := time.NewTicker(u.interval)
 	defer ticker.Stop()
@@ -63,10 +77,10 @@ func (u *Updater) Run(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			u.logf("Zaplanowana aktualizacja list IP...")
-			u.updateAll()
+			u.updateAll(false)
 		case <-u.manualTrigger:
 			u.logf("Ręczne wyzwolenie aktualizacji...")
-			u.updateAll()
+			u.updateAll(false)
 		case <-ctx.Done():
 			u.logf("Aktualizator zatrzymany")
 			return
@@ -105,7 +119,7 @@ func (u *Updater) IsRunning() bool {
 	return u.running
 }
 
-func (u *Updater) updateAll() {
+func (u *Updater) updateAll(silent bool) {
 	// Copy sources under lock, then fetch without holding the lock
 	u.mu.Lock()
 	sources := make([]Source, len(u.sources))
@@ -114,25 +128,38 @@ func (u *Updater) updateAll() {
 
 	now := time.Now()
 	var allRanges []core.IPRange
+	perSource := make(map[string][]core.IPRange)
 	for i, src := range sources {
 		if !src.Enabled {
 			continue
 		}
 		data, err := u.fetcher.Fetch(src)
 		if err != nil {
-			u.logf("Nie można pobrać %s: %v", src.Name, err)
+			if !silent {
+				u.logf("Nie można pobrać %s: %v", src.Name, err)
+			}
 			continue
 		}
 		ranges, err := core.Parse(data, core.Format(src.Format))
 		if err != nil {
-			u.logf("Błąd parsowania %s: %v", src.Name, err)
+			if !silent {
+				u.logf("Błąd parsowania %s: %v", src.Name, err)
+			}
 			continue
 		}
+		perSource[src.Name] = ranges
 		allRanges = append(allRanges, ranges...)
 		sources[i].LastSync = now
 		sources[i].RangeCount = len(ranges)
-		u.logf("Załadowano %d zakresów z %s", len(ranges), src.Name)
+		if !silent {
+			u.logf("Załadowano %d zakresów z %s", len(ranges), src.Name)
+		}
 	}
+
+	// Store per-source ranges before merge (for source lookup I2)
+	u.mu.Lock()
+	u.sourceRanges = perSource
+	u.mu.Unlock()
 
 	// Lock only for the final merge + reload (fast operation)
 	u.mu.Lock()
@@ -149,7 +176,9 @@ func (u *Updater) updateAll() {
 	if u.onReload != nil {
 		u.onReload(newDB)
 	}
-	u.logf("Baza IP przeładowana: %d zakresów (po merge'u)", len(newDB.Ranges()))
+	if !silent {
+		u.logf("Baza IP przeładowana: %d zakresów (po merge'u)", len(newDB.Ranges()))
+	}
 }
 
 func (u *Updater) logf(format string, args ...interface{}) {

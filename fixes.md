@@ -54,11 +54,13 @@
 - [x] **A5** Wydzielenie komponentów React — Dashboard, LogView, SourcesView, AddSourceDialog — każdy osobny plik
 - [x] **A8** Ikona w systray — `systray.SetIcon(iconData)` z własną ikoną użytkownika
 - [x] **A14** `appCtx` global usunięty — brak globalnych zmiennych w main.go
+- [x] **I1** Powiadomienia Windows — toast notification gdy lista się zaktualizuje (z opcją wyłączenia w ustawieniach)
+- [x] **I2** Podgląd źródła blokady — kliknięcie na zablokowany IP w zakładce Wykresy pokazuje z której listy pochodzi
+- [x] **RingBuffer** Testy + benchmarki z `-race` — 10 testów, 2 benchmarki, wszystkie bez race condition
 
 ### 🔴 Do zrobienia — krytyczne
 
 - [ ] **A1** Instalator NSIS — `build/installer/installer.nsis` nie istnieje. Pełny instalator z WebView2 bootstrapem i obsługą drivera
-- [ ] **A2** Autostart z systemem — `Config.StartWithSystem` istnieje, ale brak implementacji (rejestr Windows)
 
 ### 🟠 Warte dodania
 
@@ -67,14 +69,12 @@
 - [ ] **A9** Testy integracyjne — `go test -race ./...` są testy core, brak pipeline/updater/app
 - [ ] **A10** Rotacja logów — `LogMaxSizeMB` istnieje, logger nie rotuje plików
 - [x] **A11** Wykres blokad — line chart (Chart.js), blokowane vs przepuszczone pakiety/s, przełącznik 5m/10m/30m
-- [ ] **I1** Powiadomienia Windows — toast notification gdy lista się zaktualizuje
-- [ ] **I2** Podgląd źródła blokady — kliknięcie na zablokowany IP w logu pokazuje z której listy pochodzi
 - [x] **I3** Statystyki per lista — ile zakresów pochodzi z FireHOL, ile ze Spamhaus itd., widoczne w zakładce Źródła
 
 ### 🟡 Drobne poprawki
 
 - [x] **A12** Podwójny MergeRanges — `updateAll` woła `MergeRanges`, potem `NewDatabase` woła go drugi raz — zbędne
-- [ ] **A13** README nieaktualne — wspomina o winutil, iblocklist, starych źródłach
+- [x] **A13** README zaktualizowany — dodane nowe features (notyfikacje, podgląd źródła, statystyki per lista, wykres blokad)
 - [ ] **I4** Harmonogram aktualizacji — opcja "aktualizuj o konkretnej godzinie" (np. 3:00)
 - [ ] **I5** Auto-backup config — kopia `config.json` przed każdą aktualizacją list
 
@@ -106,10 +106,10 @@
 | Status | Liczba |
 |---|---|
 | ✅ Fixy wykonane | **20** |
-| ✅ Z audytu zrobione | **9** (A3–A6, A8, A11–A12, A14, I3) |
+| ✅ Z audytu zrobione | **13** (A3–A6, A8, A11–A14, I1–I3, RingBuffer) |
 | ❌ Nie dotyczy | **2** (#13, #16) |
-| 🔴 Do zrobienia — krytyczne | **2** (A1–A2) |
-| 🟠 Do zrobienia — warte dodania | **5** (A7, A9–A10, I1–I2) |
-| 🟡 Do zrobienia — drobne poprawki | **3** (A13, I4–I5) |
+| 🔴 Do zrobienia — krytyczne | **1** (A1) |
+| 🟠 Do zrobienia — warte dodania | **3** (A7, A9, A10) |
+| 🟡 Do zrobienia — drobne poprawki | **2** (I4–I5) |
 | 🟢 Koncepcyjne / przyszłe | **6** (A15–A18, I6–I7) |
 | 🔮 go-dnsblock | **1** (integracja future) |

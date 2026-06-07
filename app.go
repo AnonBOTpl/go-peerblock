@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
+	"net"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -29,6 +31,9 @@ type App struct {
 	cache          *core.DecisionCache
 	allowlist      *core.Allowlist
 	allowlistDone  chan struct{}
+	logSubCh      chan logger.LogEntry
+	eventsDone    chan struct{}
+	sourceRanges  map[string][]core.IPRange
 }
 
 // NewApp creates a new App instance.
@@ -59,6 +64,14 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.logger = logger
 	a.logger.Info("go-peerblock uruchomiony")
+
+	// Forward log entries to frontend in real-time via Wails events
+	a.logSubCh = a.logger.Subscribe()
+	go func() {
+		for entry := range a.logSubCh {
+			runtime.EventsEmit(a.ctx, "log", entry)
+		}
+	}()
 
 	// Apply autostart setting (sync config state to registry)
 	a.applyAutostart()
@@ -99,13 +112,31 @@ func (a *App) startup(ctx context.Context) {
 				_ = a.configP.Save(a.cfg)
 			}
 			a.logger.Info("Baza IP przeładowana: %d zakresów", len(newDB.Ranges()))
+			// Save per-source ranges for source lookup (I2)
+			a.sourceRanges = a.updater.GetSourceRanges()
+			// Notify frontend about the database and cache changes
+			runtime.EventsEmit(a.ctx, "db-info", a.GetDatabaseInfo())
+			runtime.EventsEmit(a.ctx, "cache-info", a.GetCacheInfo())
+			// Signal update completion so frontend can re-enable the button
+			runtime.EventsEmit(a.ctx, "update-status", map[string]interface{}{
+				"ok":     true,
+				"ranges": len(newDB.Ranges()),
+			})
 		},
 		func(format string, args ...interface{}) {
-			a.logger.Info(format, args...)
+			a.logger.Debug(format, args...)
 		},
 		cfg.UpdateInterval,
 	)
 	go a.updater.Run(ctx)
+
+	// Emit initial db-info and cache-info
+	runtime.EventsEmit(a.ctx, "db-info", a.GetDatabaseInfo())
+	runtime.EventsEmit(a.ctx, "cache-info", a.GetCacheInfo())
+
+	// Start the stats event emitter (every 1 second)
+	a.eventsDone = make(chan struct{})
+	go a.eventsEmitter()
 
 	// Initialize WinDivert and pipeline (if protection is enabled)
 	if cfg.ProtectionEnabled {
@@ -115,6 +146,7 @@ func (a *App) startup(ctx context.Context) {
 
 // shutdown is called when the Wails application exits.
 func (a *App) shutdown(ctx context.Context) {
+	a.eventsStop()
 	if a.pipeline != nil {
 		a.pipeline.Close()
 		a.pipeline = nil
@@ -142,6 +174,32 @@ func (a *App) GetStats() filter.Stats {
 		return filter.Stats{}
 	}
 	return a.pipeline.GetStats()
+}
+
+// eventsEmitter sends real-time stats to the frontend every second.
+func (a *App) eventsEmitter() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			stats := a.GetStats()
+			runtime.EventsEmit(a.ctx, "stats", stats)
+		case <-a.eventsDone:
+			return
+		}
+	}
+}
+
+// eventsStop cleanly shuts down event emitters and log subscription.
+func (a *App) eventsStop() {
+	if a.eventsDone != nil {
+		close(a.eventsDone)
+	}
+	if a.logSubCh != nil {
+		a.logger.Unsubscribe(a.logSubCh)
+		a.logSubCh = nil
+	}
 }
 
 // GetLogs returns the last n log entries.
@@ -173,6 +231,9 @@ func (a *App) ToggleProtection() {
 		a.pipeline.Close()
 		a.pipeline = nil
 		a.logger.Info("Ochrona wyłączona")
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "protection", false)
+		}
 	} else {
 		a.startProtection()
 	}
@@ -186,6 +247,9 @@ func (a *App) SetProtectionEnabled(enabled bool) {
 		if a.pipeline != nil {
 			a.pipeline.Close()
 			a.pipeline = nil
+		}
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "protection", false)
 		}
 	}
 	a.cfg.ProtectionEnabled = enabled
@@ -242,6 +306,30 @@ func (a *App) ResetAllowlist() error {
 	return a.configP.Save(a.cfg)
 }
 
+// LookupBlockSource returns which source lists contain the given IP address.
+func (a *App) LookupBlockSource(ipStr string) []string {
+	ip := net.ParseIP(ipStr).To4()
+	if ip == nil {
+		return nil
+	}
+	ipU32 := binary.BigEndian.Uint32(ip)
+
+	if a.sourceRanges == nil {
+		return nil
+	}
+
+	var sources []string
+	for name, ranges := range a.sourceRanges {
+		for _, r := range ranges {
+			if ipU32 >= r.Start && ipU32 <= r.End {
+				sources = append(sources, name)
+				break
+			}
+		}
+	}
+	return sources
+}
+
 // MinimizeToTray hides the application window to the system tray.
 func (a *App) MinimizeToTray() {
 	if a.ctx != nil {
@@ -268,7 +356,7 @@ func (a *App) startProtection() {
 		a.logger.Error("Nie można otworzyć WinDivert: %v", err)
 		return
 	}
-	a.logger.Info("WinDivert otwarty: %s", filter.DefaultFilter())
+	a.logger.Debug("WinDivert otwarty: %s", filter.DefaultFilter())
 
 	a.pipeline = filter.NewPipeline(wd, &a.db, a.cache, a.allowlist, workerCount)
 	a.pipeline.SetOnBlock(func(srcIP, dstIP uint32, proto uint8) {
@@ -287,6 +375,10 @@ func (a *App) startProtection() {
 	})
 	a.pipeline.Start()
 	a.logger.Info("Ochrona włączona (%d workerów)", workerCount)
+	// Notify frontend
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "protection", true)
+	}
 }
 
 // applyAutostart syncs the StartWithSystem config setting to the Windows registry.
@@ -309,13 +401,13 @@ func (a *App) applyAutostart() {
 		if err := k.SetStringValue("go-peerblock", exePath); err != nil {
 			a.logger.Error("Nie można ustawić autostart w rejestrze: %v", err)
 		} else {
-			a.logger.Info("Autostart włączony: %s", exePath)
+			a.logger.Debug("Autostart włączony: %s", exePath)
 		}
 	} else {
 		if err := k.DeleteValue("go-peerblock"); err != nil && err != registry.ErrNotExist {
 			a.logger.Error("Nie można usunąć autostart z rejestru: %v", err)
 		} else {
-			a.logger.Info("Autostart wyłączony")
+			a.logger.Debug("Autostart wyłączony")
 		}
 	}
 }
