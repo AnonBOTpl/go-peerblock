@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"regexp"
 	"strings"
 )
 
@@ -20,6 +21,9 @@ const (
 	FormatPlainRange     // Plain range: "1.2.3.0-1.2.3.255"
 )
 
+// p2pHeaderRegexp matches P2P format header like "Level1:1.2.3.0"
+var p2pHeaderRegexp = regexp.MustCompile(`\w+:\d+\.\d+\.\d+\.\d+`)
+
 // FormatDetector auto-detects the format of IP list data.
 type FormatDetector struct{}
 
@@ -33,7 +37,7 @@ func (d FormatDetector) Detect(r io.Reader) (Format, io.Reader, error) {
 	switch {
 	case bytes.Contains(header, []byte(" - ")) && bytes.Contains(header, []byte(" , ")):
 		return FormatDAT, combined, nil
-	case bytes.Contains(header, []byte(":")):
+	case p2pHeaderRegexp.Match(header):
 		return FormatP2PText, combined, nil
 	default:
 		return FormatCIDR, combined, nil

@@ -9,28 +9,32 @@ import (
 	"go-peerblock/core"
 )
 
+// BlockCallback is called when a packet is blocked, with source IP, destination IP, and protocol.
+type BlockCallback func(srcIP, dstIP uint32, proto uint8)
+
 // Pipeline processes packets through a multi-worker pipeline.
 type Pipeline struct {
 	wd          *WinDivert
-	db          *core.IPDatabase
+	db          *atomic.Pointer[core.IPDatabase]
 	cache       *core.DecisionCache
 	allowlist   *core.Allowlist
 	packetCh    chan Packet
 	sendCh      chan Packet
 	workerCount int
-	stats       atomic.Value
+	allowed     atomic.Uint64
+	blocked     atomic.Uint64
+	dropped     atomic.Uint64
+	startedAt   int64
 	done        chan struct{}
 	started     atomic.Bool
+	onBlock     BlockCallback
 }
 
 // NewPipeline creates a new packet processing pipeline.
-func NewPipeline(wd *WinDivert, db *core.IPDatabase, cache *core.DecisionCache, allowlist *core.Allowlist, workerCount int) *Pipeline {
+func NewPipeline(wd *WinDivert, db *atomic.Pointer[core.IPDatabase], cache *core.DecisionCache, allowlist *core.Allowlist, workerCount int) *Pipeline {
 	if workerCount <= 0 {
 		workerCount = 4
 	}
-	stats := Stats{StartedAt: time.Now().UnixNano()}
-	var sv atomic.Value
-	sv.Store(stats)
 
 	return &Pipeline{
 		wd:          wd,
@@ -40,7 +44,7 @@ func NewPipeline(wd *WinDivert, db *core.IPDatabase, cache *core.DecisionCache, 
 		packetCh:    make(chan Packet, 4096),
 		sendCh:      make(chan Packet, 4096),
 		workerCount: workerCount,
-		stats:       sv,
+		startedAt:   time.Now().UnixNano(),
 		done:        make(chan struct{}),
 	}
 }
@@ -73,6 +77,11 @@ func (p *Pipeline) Stop() {
 		return
 	}
 	p.started.Store(false)
+	// Close WinDivert handle first to unblock any pending Recv() call,
+	// then signal goroutines via done channel.
+	if p.wd != nil && p.wd.IsOpen() {
+		p.wd.Close()
+	}
 	close(p.done)
 }
 
@@ -81,9 +90,19 @@ func (p *Pipeline) IsRunning() bool {
 	return p.started.Load()
 }
 
+// SetOnBlock registers a callback invoked when a packet is blocked.
+func (p *Pipeline) SetOnBlock(fn BlockCallback) {
+	p.onBlock = fn
+}
+
 // GetStats returns a copy of the current stats.
 func (p *Pipeline) GetStats() Stats {
-	return p.stats.Load().(Stats)
+	return Stats{
+		Allowed:   p.allowed.Load(),
+		Blocked:   p.blocked.Load(),
+		Dropped:   p.dropped.Load(),
+		StartedAt: p.startedAt,
+	}
 }
 
 func (p *Pipeline) recvLoop() {
@@ -110,9 +129,7 @@ func (p *Pipeline) recvLoop() {
 		if isImpostor(addr) {
 			_, err := p.wd.Send(buf[:n], addr)
 			if err != nil {
-				s := p.stats.Load().(Stats)
-				s.Dropped++
-				p.stats.Store(s)
+				p.dropped.Add(1)
 			}
 			continue
 		}
@@ -125,9 +142,7 @@ func (p *Pipeline) recvLoop() {
 		select {
 		case p.packetCh <- pkt:
 		default:
-			s := p.stats.Load().(Stats)
-			s.Dropped++
-			p.stats.Store(s)
+			p.dropped.Add(1)
 		}
 	}
 }
@@ -142,14 +157,13 @@ func (p *Pipeline) worker() {
 				return
 			}
 			if p.shouldBlock(pkt) {
-				s := p.stats.Load().(Stats)
-				s.Blocked++
-				p.stats.Store(s)
+				p.blocked.Add(1)
+				if p.onBlock != nil {
+					p.onBlock(pkt.SrcIP, pkt.DstIP, pkt.Proto)
+				}
 				continue
 			}
-			s := p.stats.Load().(Stats)
-			s.Allowed++
-			p.stats.Store(s)
+			p.allowed.Add(1)
 			select {
 			case <-p.done:
 				return
@@ -170,34 +184,43 @@ func (p *Pipeline) sendLoop() {
 			}
 			_, err := p.wd.Send(pkt.Data, pkt.Addr)
 			if err != nil {
-				s := p.stats.Load().(Stats)
-				s.Dropped++
-				p.stats.Store(s)
+				p.dropped.Add(1)
 			}
 		}
 	}
 }
 
 func (p *Pipeline) shouldBlock(pkt Packet) bool {
-	if p.allowlist.Contains(pkt.SrcIP) || p.allowlist.Contains(pkt.DstIP) {
+	// Only check destination IP against allowlist — source IP is the user's local IP
+	// (e.g. 192.168.x.x, 172.16.x.x, 10.x.x.x) and was never meant to bypass blocking.
+	if p.allowlist.Contains(pkt.DstIP) {
 		return false
 	}
-	db := p.db
+
+	// Only check destination IP against the DB — checking source IP would block
+	// ALL traffic if the user's private IP happens to be in a blocklist range
+	// (e.g. firehol-level1 includes 172.16.0.0/12, 10.0.0.0/8).
+	ip := pkt.DstIP
+	if blocked, ok := p.cache.Get(ip); ok {
+		if blocked {
+			// Re-verify with current DB — guards against stale cache entries
+			// caused by a race: worker loads old DB before Store+Clear, then
+			// caches "blocked" from old DB after both clears.
+			db := p.db.Load()
+			if db == nil || !db.Contains(ip) {
+				// DB was updated — this IP is no longer blocked
+				p.cache.Set(ip, false)
+				return false
+			}
+			return true
+		}
+		return false
+	}
+	db := p.db.Load()
 	if db == nil {
 		return false
 	}
-	for _, ip := range []uint32{pkt.SrcIP, pkt.DstIP} {
-		if blocked, ok := p.cache.Get(ip); ok {
-			if blocked {
-				return true
-			}
-			continue
-		}
-		blocked := db.Contains(ip)
-		p.cache.Set(ip, blocked)
-		if blocked {
-			return true
-		}
-	}
-	return false
+	blocked := db.Contains(ip)
+	p.cache.Set(ip, blocked)
+	return blocked
 }

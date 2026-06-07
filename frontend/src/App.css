@@ -85,6 +85,24 @@ html, body, #root {
   transform: scale(0.97);
 }
 
+.tray-btn {
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.tray-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
 /* ─── Main ───────────────────────────────────────────── */
 .app-main {
   flex: 1;
@@ -311,6 +329,13 @@ html, body, #root {
 .log-info .log-level { color: var(--accent); }
 .log-warn .log-level { color: var(--amber); }
 .log-error .log-level { color: var(--red); }
+.log-blocked .log-level { color: var(--red); }
+.log-blocked .log-msg { color: #f87171; font-weight: 600; }
+.log-blocked {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid var(--red);
+  padding-left: 13px;
+}
 
 /* Scrollbar */
 .log-entries::-webkit-scrollbar {
@@ -762,6 +787,151 @@ html, body, #root {
 
 .modal-confirm-text strong {
   color: var(--text-primary);
+}
+
+/* ─── Settings View ──────────────────────────────────── */
+.settings-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.settings-section h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.settings-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 180px;
+  flex-shrink: 0;
+}
+
+.settings-label code {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.settings-description {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.settings-input {
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  outline: none;
+  width: 100px;
+}
+
+.settings-input:focus {
+  border-color: var(--accent);
+}
+
+.settings-input[type="number"] {
+  text-align: right;
+}
+
+.settings-select {
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  outline: none;
+  cursor: pointer;
+}
+
+.settings-select:focus {
+  border-color: var(--accent);
+}
+
+.settings-textarea {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  transition: border-color 0.15s;
+  outline: none;
+  resize: vertical;
+  min-height: 120px;
+  width: 100%;
+  line-height: 1.5;
+}
+
+.settings-textarea:focus {
+  border-color: var(--accent);
+}
+
+.settings-saved {
+  display: inline-block;
+  padding: 6px 16px;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  animation: fadeIn 0.3s ease;
+}
+
+.settings-error {
+  display: inline-block;
+  padding: 6px 16px;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── Form Fields ──────────────────────────────────────── */

@@ -35,6 +35,7 @@ func NewAllowlist(entries []string) *Allowlist {
 			a.staticRanges = append(a.staticRanges, IPRange{Start: n, End: n})
 		}
 	}
+	a.staticRanges = MergeRanges(a.staticRanges)
 	a.ranges = a.staticRanges
 	return a
 }

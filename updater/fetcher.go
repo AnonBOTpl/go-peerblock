@@ -56,6 +56,11 @@ func (f *Fetcher) Fetch(src Source) ([]byte, error) {
 }
 
 func (f *Fetcher) fetchOnce(url, apiKey string) ([]byte, error) {
+	// Handle file:// URLs — read directly from disk
+	if len(url) >= 7 && url[:7] == "file://" {
+		return f.fetchFile(url[7:])
+	}
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -88,6 +93,23 @@ func (f *Fetcher) fetchOnce(url, apiKey string) ([]byte, error) {
 		return f.decompressGzip(data)
 	}
 
+	return data, nil
+}
+
+// fetchFile reads data from a local file path (file:// URL handler).
+func (f *Fetcher) fetchFile(path string) ([]byte, error) {
+	// Trim leading slash on Windows: file:///C:/... → C:/...
+	// On Windows, path after file:/// starts with /C:/...
+	if len(path) > 2 && path[0] == '/' && path[2] == ':' {
+		path = path[1:] // /C:/... → C:/...
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("file read error: %w", err)
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty file: %s", path)
+	}
 	return data, nil
 }
 

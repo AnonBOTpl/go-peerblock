@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"go-peerblock/config"
 	"go-peerblock/core"
@@ -17,15 +18,16 @@ import (
 
 // App is the main application struct, binding Go methods to the Wails frontend.
 type App struct {
-	ctx       context.Context
-	pipeline  *filter.Pipeline
-	updater   *updater.Updater
-	logger    *logger.Logger
-	cfg       *config.Config
-	configP   *config.Persistence
-	db        atomic.Pointer[core.IPDatabase]
-	cache     *core.DecisionCache
-	allowlist *core.Allowlist
+	ctx           context.Context
+	pipeline       *filter.Pipeline
+	updater        *updater.Updater
+	logger         *logger.Logger
+	cfg            *config.Config
+	configP        *config.Persistence
+	db             atomic.Pointer[core.IPDatabase]
+	cache          *core.DecisionCache
+	allowlist      *core.Allowlist
+	allowlistDone  chan struct{}
 }
 
 // NewApp creates a new App instance.
@@ -36,7 +38,6 @@ func NewApp() *App {
 // startup is called when the Wails application starts.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	appCtx = ctx
 
 	// Initialize configuration
 	a.configP = config.NewPersistence()
@@ -65,19 +66,35 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize cache with configurable TTL
 	cacheTTL := cfg.CacheTTL
 	if cacheTTL <= 0 {
-		cacheTTL = 5 * 60 * 1000000000 // 5 minutes default
+		cacheTTL = 5 * time.Minute
 	}
 	a.cache = core.NewDecisionCache(cfg.CacheSize, cacheTTL)
 
 	// Initialize allowlist
 	a.allowlist = core.NewAllowlist(cfg.Allowlist)
-	go a.allowlist.StartRefreshLoop(30*60*1000000000, make(chan struct{})) // 30 min refresh
+	a.allowlistDone = make(chan struct{})
+	go a.allowlist.StartRefreshLoop(30*time.Minute, a.allowlistDone)
 
 	// Initialize updater
 	fetcher := updater.NewFetcher(filepath.Join(getAppDataDir(), "cache"))
 	a.updater = updater.NewUpdater(cfg.Sources, fetcher,
 		func(newDB *core.IPDatabase) {
+			// Clear before Store to prevent workers from caching old DB results
+			a.cache.Clear()
 			a.db.Store(newDB)
+			a.cache.Clear() // Extra safety: clear any entries cached between the two clears
+			// Sync LastSync from updater back to config so GUI sees correct dates
+			if upSources := a.updater.GetSources(); len(upSources) > 0 {
+				for i := range a.cfg.Sources {
+					for _, us := range upSources {
+						if us.Name == a.cfg.Sources[i].Name && !us.LastSync.IsZero() {
+							a.cfg.Sources[i].LastSync = us.LastSync
+							break
+						}
+					}
+				}
+				_ = a.configP.Save(a.cfg)
+			}
 			a.logger.Info("Baza IP przeładowana: %d zakresów", len(newDB.Ranges()))
 		},
 		func(format string, args ...interface{}) {
@@ -99,8 +116,13 @@ func (a *App) shutdown(ctx context.Context) {
 		a.pipeline.Close()
 		a.pipeline = nil
 	}
+	if a.allowlistDone != nil {
+		close(a.allowlistDone)
+	}
 	if a.logger != nil {
-		_ = a.logger.Close()
+		if err := a.logger.Close(); err != nil {
+			runtime.LogError(ctx, "Logger close error: "+err.Error())
+		}
 	}
 }
 
@@ -175,6 +197,9 @@ func (a *App) GetConfig() config.Config {
 // SaveConfig saves a new configuration.
 func (a *App) SaveConfig(cfg config.Config) error {
 	*a.cfg = cfg
+	if a.updater != nil {
+		a.updater.RefreshSources(cfg.Sources)
+	}
 	return a.configP.Save(a.cfg)
 }
 
@@ -191,6 +216,27 @@ func (a *App) GetDatabaseInfo() map[string]interface{} {
 	}
 }
 
+// GetCacheInfo returns cache usage information.
+func (a *App) GetCacheInfo() map[string]interface{} {
+	if a.cache == nil {
+		return map[string]interface{}{
+			"entries": 0,
+			"max":     65536,
+		}
+	}
+	return map[string]interface{}{
+		"entries": a.cache.Len(),
+		"max":     a.cfg.CacheSize,
+	}
+}
+
+// MinimizeToTray hides the application window to the system tray.
+func (a *App) MinimizeToTray() {
+	if a.ctx != nil {
+		runtime.WindowHide(a.ctx)
+	}
+}
+
 // --- Internal helpers ---
 
 func (a *App) startProtection() {
@@ -200,7 +246,6 @@ func (a *App) startProtection() {
 		a.pipeline = nil
 	}
 
-	db := a.db.Load()
 	workerCount := a.cfg.WorkerCount
 	if workerCount <= 0 {
 		workerCount = filter.RecommendedWorkerCount()
@@ -213,7 +258,21 @@ func (a *App) startProtection() {
 	}
 	a.logger.Info("WinDivert otwarty: %s", filter.DefaultFilter())
 
-	a.pipeline = filter.NewPipeline(wd, db, a.cache, a.allowlist, workerCount)
+	a.pipeline = filter.NewPipeline(wd, &a.db, a.cache, a.allowlist, workerCount)
+	a.pipeline.SetOnBlock(func(srcIP, dstIP uint32, proto uint8) {
+		src := core.Uint32ToIP(srcIP)
+		dst := core.Uint32ToIP(dstIP)
+		protoName := "?"
+		switch proto {
+		case 6:
+			protoName = "TCP"
+		case 17:
+			protoName = "UDP"
+		case 1:
+			protoName = "ICMP"
+		}
+		a.logger.Info("BLOCK %s → %s [%s]", src, dst, protoName)
+	})
 	a.pipeline.Start()
 	a.logger.Info("Ochrona włączona (%d workerów)", workerCount)
 }

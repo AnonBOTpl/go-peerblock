@@ -13,7 +13,7 @@ type WinDivert struct {
 }
 
 // Open creates a no-op WinDivert handle.
-func Open(filter string, layer interface{}, priority int16) (*WinDivert, error) {
+func Open(filter string, layer int32, priority int16) (*WinDivert, error) {
 	return &WinDivert{}, nil
 }
 

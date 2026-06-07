@@ -3,6 +3,7 @@
 package filter
 
 import (
+	"sync/atomic"
 	"time"
 
 	"go-peerblock/core"
@@ -14,8 +15,11 @@ type Pipeline struct {
 	startedAt int64
 }
 
+// BlockCallback is a no-op stub.
+type BlockCallback func(srcIP, dstIP uint32, proto uint8)
+
 // NewPipeline creates a no-op pipeline (no WinDivert available).
-func NewPipeline(wd *WinDivert, db *core.IPDatabase, cache *core.DecisionCache, allowlist *core.Allowlist, workerCount int) *Pipeline {
+func NewPipeline(wd *WinDivert, db *atomic.Pointer[core.IPDatabase], cache *core.DecisionCache, allowlist *core.Allowlist, workerCount int) *Pipeline {
 	return &Pipeline{}
 }
 
@@ -43,6 +47,10 @@ func (p *Pipeline) IsRunning() bool {
 // GetStats returns basic stats with start time.
 func (p *Pipeline) GetStats() Stats {
 	return Stats{StartedAt: p.startedAt}
+}
+
+// SetOnBlock is a no-op in stub mode.
+func (p *Pipeline) SetOnBlock(fn BlockCallback) {
 }
 
 // shouldBlock is a no-op in stub mode.

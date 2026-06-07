@@ -21,6 +21,11 @@ func RunTray(app App) {
 	}, nil)
 }
 
+// QuitTray signals the system tray to exit.
+func QuitTray() {
+	systray.Quit()
+}
+
 func setupMenu(app App) {
 	// We need icon data. For now, use a placeholder.
 	// In production: systray.SetIcon(iconData)
@@ -45,6 +50,9 @@ func setupMenu(app App) {
 				app.ToggleProtection()
 				updateToggleLabel(mToggle, app.IsProtectionEnabled())
 			case <-mQuit.ClickedCh:
+				if ctx := app.GetCtx(); ctx != nil {
+					runtime.Quit(ctx)
+				}
 				systray.Quit()
 			}
 		}

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
-import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetConfig, SaveConfig } from "../wailsjs/go/main/App";
+import { GetStats, GetLogs, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetConfig, SaveConfig, GetCacheInfo, MinimizeToTray } from "../wailsjs/go/main/App";
 import { config, filter, logger, updater } from "../wailsjs/go/models";
 type Stats = filter.Stats;
 type LogEntry = logger.LogEntry;
 type Source = updater.Source;
-type Tab = 'dashboard' | 'sources';
+type Tab = 'dashboard' | 'sources' | 'settings';
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -77,7 +77,8 @@ function LogView({ logs, onClear }: LogViewProps) {
     }
   }, [filteredLogs.length, autoScroll]);
 
-  const getLevelClass = (level: number) => {
+  const getLevelClass = (level: number, msg: string) => {
+    if (msg.startsWith('BLOCK')) return 'log-blocked';
     switch (level) {
       case 0: return 'log-debug';
       case 1: return 'log-info';
@@ -117,7 +118,7 @@ function LogView({ logs, onClear }: LogViewProps) {
           <div className="log-empty">Brak zdarzeń...</div>
         ) : (
           filteredLogs.map((e, i) => (
-            <div key={i} className={`log-entry ${getLevelClass(e.level)}`}>
+            <div key={i} className={`log-entry ${getLevelClass(e.level, e.message)}`}>
               <span className="log-level">{getLevelLabel(e.level)}</span>
               <span className="log-msg">{e.message}</span>
             </div>
@@ -210,7 +211,7 @@ function AddSourceDialog({ onClose, onSave }: {
 
 // ─── Sources View ────────────────────────────────────────
 
-function SourcesView({ onUpdate }: { onUpdate: () => void }) {
+function SourcesView({ onUpdate, updating }: { onUpdate: () => void; updating: boolean }) {
   const [cfg, setCfg] = useState<config.Config | null>(null);
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -282,8 +283,8 @@ function SourcesView({ onUpdate }: { onUpdate: () => void }) {
           <button className="btn-secondary" onClick={() => setShowAdd(true)}>
             + Dodaj źródło
           </button>
-          <button className="update-btn" onClick={onUpdate}>
-            ↻ Aktualizuj teraz
+          <button className="update-btn" onClick={onUpdate} disabled={updating}>
+            {updating ? '⏳' : '↻'} Aktualizuj
           </button>
         </div>
       </div>
@@ -367,12 +368,201 @@ function SourcesView({ onUpdate }: { onUpdate: () => void }) {
   );
 }
 
+// ─── Settings View ─────────────────────────────────────
+
+function SettingsView() {
+  const [cfg, setCfg] = useState<config.Config | null>(null);
+  const [allowlistText, setAllowlistText] = useState('');
+  const [workerCount, setWorkerCount] = useState('0');
+  const [cacheSize, setCacheSize] = useState('65536');
+  const [cacheTtl, setCacheTtl] = useState('5');
+  const [updateInterval, setUpdateInterval] = useState('24');
+  const [logLevel, setLogLevel] = useState('info');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadConfig = useCallback(async () => {
+    try {
+      const c = await GetConfig();
+      setCfg(c);
+      setAllowlistText((c.allowlist || []).join('\n'));
+      setWorkerCount(String(c.worker_count ?? 0));
+      setCacheSize(String(c.cache_size ?? 65536));
+      // time.Duration is nanoseconds in JSON, convert to minutes
+      const ttlNs = c.cache_ttl ?? 300000000000;
+      setCacheTtl(String(Math.round(ttlNs / 60000000000)));
+      const intervalNs = c.update_interval ?? 86400000000000;
+      setUpdateInterval(String(Math.round(intervalNs / 3600000000000)));
+      setLogLevel(c.log_level || 'info');
+    } catch (err) {
+      console.error('load config error', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const handleSave = async () => {
+    if (!cfg) return;
+    setSaving(true);
+    setSaved(false);
+    setError('');
+    try {
+      const allowlist = allowlistText
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l !== '' && !l.startsWith('#'));
+      
+      const wc = parseInt(workerCount, 10);
+      if (isNaN(wc) || wc < 0) throw new Error('Nieprawidłowa liczba workerów');
+      const cs = parseInt(cacheSize, 10);
+      if (isNaN(cs) || cs < 1) throw new Error('Nieprawidłowy rozmiar cache');
+      const ttl = parseInt(cacheTtl, 10);
+      if (isNaN(ttl) || ttl < 1) throw new Error('Nieprawidłowy TTL');
+      const interval = parseInt(updateInterval, 10);
+      if (isNaN(interval) || interval < 1) throw new Error('Nieprawidłowy interwał');
+
+      const updated = new config.Config({
+        ...cfg,
+        allowlist,
+        worker_count: wc,
+        cache_size: cs,
+        cache_ttl: ttl * 60000000000, // minutes → nanoseconds
+        update_interval: interval * 3600000000000, // hours → nanoseconds
+        log_level: logLevel,
+      });
+      await SaveConfig(updated);
+      setCfg(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Błąd zapisu');
+      setTimeout(() => setError(''), 5000);
+    }
+    setSaving(false);
+  };
+
+  if (!cfg) {
+    return <div className="sources-loading">Ładowanie ustawień...</div>;
+  }
+
+  return (
+    <div className="settings-view">
+      <div className="settings-section">
+        <h3>Allowlista</h3>
+        <div className="form-field">
+          <span>Adresy IP, CIDR lub domeny (jeden na linię)</span>
+          <textarea
+            className="settings-textarea"
+            value={allowlistText}
+            onChange={e => setAllowlistText(e.target.value)}
+            placeholder="8.8.8.8&#10;192.168.0.0/16&#10;*.example.com"
+            rows={6}
+          />
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>Wydajność</h3>
+        <div className="settings-row">
+          <span className="settings-label">Liczba workerów <code>worker_count</code></span>
+          <div>
+            <input
+              type="number"
+              className="settings-input"
+              value={workerCount}
+              onChange={e => setWorkerCount(e.target.value)}
+              min="0"
+              max="64"
+            />
+            <div className="settings-description">0 = automatycznie (liczba CPU)</div>
+          </div>
+        </div>
+        <div className="settings-row">
+          <span className="settings-label">Rozmiar cache <code>cache_size</code></span>
+          <div>
+            <input
+              type="number"
+              className="settings-input"
+              value={cacheSize}
+              onChange={e => setCacheSize(e.target.value)}
+              min="1024"
+              max="1048576"
+            />
+            <div className="settings-description">Liczba wpisów w cache decyzji</div>
+          </div>
+        </div>
+        <div className="settings-row">
+          <span className="settings-label">Cache TTL <code>cache_ttl</code></span>
+          <div>
+            <input
+              type="number"
+              className="settings-input"
+              value={cacheTtl}
+              onChange={e => setCacheTtl(e.target.value)}
+              min="1"
+              max="1440"
+            />
+            <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>minut</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>Aktualizacje</h3>
+        <div className="settings-row">
+          <span className="settings-label">Interwał aktualizacji <code>update_interval</code></span>
+          <div>
+            <input
+              type="number"
+              className="settings-input"
+              value={updateInterval}
+              onChange={e => setUpdateInterval(e.target.value)}
+              min="1"
+              max="168"
+            />
+            <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>godzin</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>Logowanie</h3>
+        <div className="settings-row">
+          <span className="settings-label">Poziom logowania <code>log_level</code></span>
+          <select
+            className="settings-select"
+            value={logLevel}
+            onChange={e => setLogLevel(e.target.value)}
+          >
+            <option value="debug">DEBUG — wszystko</option>
+            <option value="info">INFO — informacje + błędy</option>
+            <option value="warn">WARN — tylko ostrzeżenia + błędy</option>
+            <option value="error">ERROR — tylko błędy</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="settings-actions">
+        <button className="btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? '⏳ Zapisywanie...' : '💾 Zapisz ustawienia'}
+        </button>
+        {saved && <span className="settings-saved">✅ Zapisano!</span>}
+        {error && <span className="settings-error">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard ───────────────────────────────────────────
 
-function Dashboard({ stats, uptime, dbInfo, protected_, onToggle }: {
+function Dashboard({ stats, uptime, dbInfo, cacheInfo, protected_, onToggle }: {
   stats: Stats | null;
   uptime: string;
   dbInfo: Record<string, any>;
+  cacheInfo: Record<string, any>;
   protected_: boolean;
   onToggle: () => void;
 }) {
@@ -401,6 +591,11 @@ function Dashboard({ stats, uptime, dbInfo, protected_, onToggle }: {
         <StatCard label="Zakresy IP" value={dbInfo['ranges'] ?? 0} color="#3b82f6" />
         <StatCard label="Uptime" value={uptime} color="#8b5cf6" />
         <StatCard label="Upuszczone" value={stats?.dropped ?? 0} color="#64748b" />
+        <StatCard
+          label="Cache"
+          value={`${(cacheInfo['entries'] ?? 0).toLocaleString()} / ${(cacheInfo['max'] ?? 65536).toLocaleString()}`}
+          color="#64748b"
+        />
       </div>
     </>
   );
@@ -415,6 +610,7 @@ function App() {
   const [dbInfo, setDbInfo] = useState<Record<string, any>>({});
   const [uptime, setUptime] = useState('0s');
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [cacheInfo, setCacheInfo] = useState<Record<string, any>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -424,6 +620,8 @@ function App() {
       setProtected_(p);
       const d = await GetDatabaseInfo();
       setDbInfo(d);
+      const ci = await GetCacheInfo();
+      setCacheInfo(ci);
       const l = await GetLogs(200);
       setLogs(l);
     } catch (err) {
@@ -457,8 +655,12 @@ function App() {
     setProtected_(!protected_);
   };
 
+  const [updating, setUpdating] = useState(false);
+
   const handleUpdate = async () => {
+    setUpdating(true);
     await TriggerUpdate();
+    setTimeout(() => setUpdating(false), 3000);
   };
 
   const handleClearLogs = () => {
@@ -473,8 +675,11 @@ function App() {
           <span className="app-subtitle">IP Blocker dla Windows</span>
         </div>
         <div className="header-right">
-          <button className="update-btn" onClick={handleUpdate} title="Aktualizuj listy IP">
-            ↻ Aktualizuj
+          <button className="update-btn" onClick={handleUpdate} title="Aktualizuj listy IP" disabled={updating}>
+            {updating ? '⏳' : '↻'} Aktualizuj
+          </button>
+          <button className="tray-btn" onClick={MinimizeToTray} title="Minimalizuj do zasobnika">
+            ⬇
           </button>
         </div>
       </header>
@@ -488,16 +693,21 @@ function App() {
           className={`tab-btn ${tab === 'sources' ? 'active' : ''}`}
           onClick={() => setTab('sources')}
         >📋 Źródła list IP</button>
+        <button
+          className={`tab-btn ${tab === 'settings' ? 'active' : ''}`}
+          onClick={() => setTab('settings')}
+        >⚙️ Ustawienia</button>
       </nav>
 
       <main className="app-main">
         {tab === 'dashboard' && (
           <Dashboard
-            stats={stats} uptime={uptime} dbInfo={dbInfo}
+            stats={stats} uptime={uptime} dbInfo={dbInfo} cacheInfo={cacheInfo}
             protected_={protected_} onToggle={handleToggle}
           />
         )}
-        {tab === 'sources' && <SourcesView onUpdate={handleUpdate} />}
+        {tab === 'sources' && <SourcesView onUpdate={handleUpdate} updating={updating} />}
+        {tab === 'settings' && <SettingsView />}
         <LogView logs={logs} onClear={handleClearLogs} />
       </main>
 
@@ -509,7 +719,9 @@ function App() {
             Pakiety: {(stats.blocked + stats.allowed).toLocaleString()}
           </span>
         )}
-        <span className="status-tab">{tab === 'dashboard' ? 'Dashboard' : 'Źródła'}</span>
+        <span className="status-tab">{
+          tab === 'dashboard' ? 'Dashboard' : tab === 'sources' ? 'Źródła' : 'Ustawienia'
+        }</span>
       </footer>
     </div>
   );

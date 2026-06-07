@@ -82,6 +82,22 @@ func (u *Updater) TriggerManual() {
 	}
 }
 
+// RefreshSources updates the source list (e.g. after config save).
+func (u *Updater) RefreshSources(sources []Source) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.sources = sources
+}
+
+// GetSources returns a copy of the current source list (with updated LastSync values).
+func (u *Updater) GetSources() []Source {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	result := make([]Source, len(u.sources))
+	copy(result, u.sources)
+	return result
+}
+
 // IsRunning returns whether the updater is active.
 func (u *Updater) IsRunning() bool {
 	u.mu.Lock()
@@ -90,11 +106,15 @@ func (u *Updater) IsRunning() bool {
 }
 
 func (u *Updater) updateAll() {
+	// Copy sources under lock, then fetch without holding the lock
 	u.mu.Lock()
-	defer u.mu.Unlock()
+	sources := make([]Source, len(u.sources))
+	copy(sources, u.sources)
+	u.mu.Unlock()
 
+	now := time.Now()
 	var allRanges []core.IPRange
-	for _, src := range u.sources {
+	for i, src := range sources {
 		if !src.Enabled {
 			continue
 		}
@@ -109,11 +129,22 @@ func (u *Updater) updateAll() {
 			continue
 		}
 		allRanges = append(allRanges, ranges...)
+		sources[i].LastSync = now
 		u.logf("Załadowano %d zakresów z %s", len(ranges), src.Name)
 	}
 
+	// Lock only for the final merge + reload (fast operation)
+	u.mu.Lock()
+	// Copy LastSync back to the updater's source list
+	for i := range sources {
+		if !sources[i].LastSync.IsZero() && i < len(u.sources) {
+			u.sources[i].LastSync = sources[i].LastSync
+		}
+	}
 	merged := core.MergeRanges(allRanges)
 	newDB := core.NewDatabase(merged)
+	u.mu.Unlock()
+
 	if u.onReload != nil {
 		u.onReload(newDB)
 	}

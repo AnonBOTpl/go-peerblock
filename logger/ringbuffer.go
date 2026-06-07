@@ -8,6 +8,7 @@ type RingBuffer struct {
 	entries []LogEntry
 	pos     int
 	size    int
+	count   int
 	mu      sync.Mutex
 }
 
@@ -23,6 +24,9 @@ func NewRingBuffer(size int) *RingBuffer {
 func (r *RingBuffer) Add(e LogEntry) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.entries[r.pos].Timestamp.IsZero() {
+		r.count++
+	}
 	r.entries[r.pos] = e
 	r.pos = (r.pos + 1) % r.size
 }
@@ -52,11 +56,5 @@ func (r *RingBuffer) Last(n int) []LogEntry {
 func (r *RingBuffer) Len() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	count := 0
-	for i := 0; i < r.size; i++ {
-		if !r.entries[i].Timestamp.IsZero() {
-			count++
-		}
-	}
-	return count
+	return r.count
 }

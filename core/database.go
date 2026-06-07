@@ -106,3 +106,10 @@ func IPToUint32(ip net.IP) uint32 {
 	}
 	return binary.BigEndian.Uint32(ip4)
 }
+
+// Uint32ToIP converts a uint32 back to dotted-decimal IPv4 string (e.g. "1.2.3.4").
+func Uint32ToIP(n uint32) string {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, n)
+	return ip.String()
+}

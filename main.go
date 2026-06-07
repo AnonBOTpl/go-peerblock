@@ -1,12 +1,16 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"embed"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
+
+	"go-peerblock/systray"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -26,6 +30,16 @@ func main() {
 
 	// Create application instance
 	app := NewApp()
+
+	// Channel to signal that systray has fully exited
+	systrayDone := make(chan struct{})
+
+	// Start system tray in background goroutine.
+	// This keeps the app alive even when the main window is hidden.
+	go func() {
+		systray.RunTray(app)
+		close(systrayDone)
+	}()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -53,6 +67,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Błąd uruchomienia Wails: %v", err)
 	}
+
+	// Wails exited (window closed). Signal systray to quit and wait.
+	systray.QuitTray()
+	<-systrayDone
 }
 
 // checkAdminAndDriver verifies admin privileges and WinDivert driver.
@@ -85,23 +103,30 @@ func isAdmin() bool {
 
 // isDriverLoaded checks if a Windows service/driver is loaded.
 func isDriverLoaded(name string) bool {
-	// Simplified: just return true for development.
-	// In production, this would query the SCM.
-	return false
+	out, err := exec.Command("sc", "query", name).Output()
+	if err != nil {
+		return false
+	}
+	return bytes.Contains(out, []byte("RUNNING"))
 }
 
 // installDriver installs and starts the WinDivert kernel driver.
 func installDriver() error {
-	// In production, this runs install-driver.bat.
-	// For development, just return nil to allow compilation.
+	batPath := filepath.Join(execDir(), "build", "installer", "install-driver.bat")
+	cmd := exec.Command("cmd", "/C", batPath)
+	cmd.Dir = execDir()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("install-driver failed: %w\nOutput: %s", err, out)
+	}
 	return nil
 }
 
-// App context is stored here so systray can access it.
-var appCtx context.Context
-
-func init() {
-	runtime.LockOSThread()
+// execDir returns the directory of the current executable.
+func execDir() string {
+	if exe, err := os.Executable(); err == nil {
+		if d := filepath.Dir(exe); d != "" {
+			return d
+		}
+	}
+	return "."
 }
-
-

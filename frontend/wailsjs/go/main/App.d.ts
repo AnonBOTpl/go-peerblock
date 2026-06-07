@@ -5,6 +5,8 @@ import {context} from '../models';
 import {logger} from '../models';
 import {filter} from '../models';
 
+export function GetCacheInfo():Promise<Record<string, any>>;
+
 export function GetConfig():Promise<config.Config>;
 
 export function GetCtx():Promise<context.Context>;
@@ -16,6 +18,8 @@ export function GetLogs(arg1:number):Promise<Array<logger.LogEntry>>;
 export function GetStats():Promise<filter.Stats>;
 
 export function IsProtectionEnabled():Promise<boolean>;
+
+export function MinimizeToTray():Promise<void>;
 
 export function SaveConfig(arg1:config.Config):Promise<void>;
 
