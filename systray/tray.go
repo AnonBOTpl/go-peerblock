@@ -2,10 +2,20 @@ package systray
 
 import (
 	"context"
+	"time"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// appIconData stores the application icon (ICO bytes) passed from main.
+var appIconData []byte
+
+// SetAppIcon sets the application icon data (ICO format bytes) for the systray.
+// Must be called before RunTray.
+func SetAppIcon(data []byte) {
+	appIconData = data
+}
 
 // App is the interface the systray needs from the main App.
 type App interface {
@@ -18,7 +28,11 @@ type App interface {
 func RunTray(app App) {
 	systray.Run(func() {
 		setupMenu(app)
-	}, nil)
+	}, func() {
+		// Wait for Windows Shell to process the icon removal (Shell_NotifyIcon NIM_DELETE).
+		// Without this delay, ghost icons accumulate when the process exits too quickly.
+		time.Sleep(200 * time.Millisecond)
+	})
 }
 
 // QuitTray signals the system tray to exit.
@@ -27,10 +41,14 @@ func QuitTray() {
 }
 
 func setupMenu(app App) {
-	// We need icon data. For now, use a placeholder.
-	// In production: systray.SetIcon(iconData)
-	systray.SetTitle("go-peerblock")
-	systray.SetTooltip("go-peerblock - IP Blocker")
+	systray.SetTooltip("GO PeerBlock - IP Filter")
+
+	// Set the tray icon from pre-converted ICO bytes
+	if len(appIconData) > 0 {
+		systray.SetIcon(appIconData)
+	} else {
+		systray.SetTitle("GO PeerBlock")
+	}
 
 	mShow := systray.AddMenuItem("Pokaż okno", "Open the main window")
 	mToggle := systray.AddMenuItem("Wyłącz ochronę", "Toggle protection")

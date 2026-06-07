@@ -21,6 +21,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed frontend/src/assets/tray.ico
+var appIconData []byte
+
 func main() {
 	// Check admin rights and WinDivert driver
 	if err := checkAdminAndDriver(); err != nil {
@@ -34,6 +37,9 @@ func main() {
 	// Channel to signal that systray has fully exited
 	systrayDone := make(chan struct{})
 
+	// Pass the icon data to the systray package before starting it.
+	systray.SetAppIcon(appIconData)
+
 	// Start system tray in background goroutine.
 	// This keeps the app alive even when the main window is hidden.
 	go func() {
@@ -43,7 +49,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "go-peerblock",
+		Title:     "GO PeerBlock - IP Filter",
 		Width:     1024,
 		Height:    768,
 		MinWidth:  800,
