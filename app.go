@@ -34,6 +34,7 @@ type App struct {
 	logSubCh      chan logger.LogEntry
 	eventsDone    chan struct{}
 	sourceRanges  map[string][]core.IPRange
+	quitting      atomic.Bool
 }
 
 // NewApp creates a new App instance.
@@ -58,7 +59,7 @@ func (a *App) startup(ctx context.Context) {
 	logDir := filepath.Join(getAppDataDir(), "logs")
 	_ = os.MkdirAll(logDir, 0755)
 	logPath := filepath.Join(logDir, "peerblock.log")
-	logger, err := logger.NewLogger(logPath, 5000)
+	logger, err := logger.NewLogger(logPath, 5000, cfg.LogMaxSizeMB)
 	if err != nil {
 		runtime.LogError(ctx, "Nie można utworzyć loggera: "+err.Error())
 	}
@@ -109,6 +110,10 @@ func (a *App) startup(ctx context.Context) {
 						}
 					}
 				}
+				// Backup config before saving (I5 — auto-backup przed aktualizacją)
+				if err := a.configP.Backup(); err != nil {
+					a.logger.Warn("Nie można utworzyć kopii zapasowej configu: %v", err)
+				}
 				_ = a.configP.Save(a.cfg)
 			}
 			a.logger.Info("Baza IP przeładowana: %d zakresów", len(newDB.Ranges()))
@@ -118,9 +123,11 @@ func (a *App) startup(ctx context.Context) {
 			runtime.EventsEmit(a.ctx, "db-info", a.GetDatabaseInfo())
 			runtime.EventsEmit(a.ctx, "cache-info", a.GetCacheInfo())
 			// Signal update completion so frontend can re-enable the button
+			diffs := a.updater.GetRangeDiffs()
 			runtime.EventsEmit(a.ctx, "update-status", map[string]interface{}{
 				"ok":     true,
 				"ranges": len(newDB.Ranges()),
+				"diffs":  diffs,
 			})
 		},
 		func(format string, args ...interface{}) {
@@ -335,6 +342,19 @@ func (a *App) MinimizeToTray() {
 	if a.ctx != nil {
 		runtime.WindowHide(a.ctx)
 	}
+}
+
+// QuitApp closes the application entirely.
+func (a *App) QuitApp() {
+	if a.ctx != nil {
+		a.quitting.Store(true)
+		runtime.Quit(a.ctx)
+	}
+}
+
+// isQuitting returns true if the app is in the process of shutting down.
+func (a *App) isQuitting() bool {
+	return a.quitting.Load()
 }
 
 // --- Internal helpers ---

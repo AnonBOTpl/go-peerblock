@@ -20,6 +20,9 @@
 - **🔍 Block source lookup** — click any blocked IP to see which blocklists contain it
 - **📋 Per-list statistics** — view how many ranges each source contributes in the Sources tab
 - **🔔 Windows toast notifications** — desktop notification when lists finish updating (toggleable)
+- **📊 Range diffs** — after each update, see how many ranges were added/removed per source (▲/▼ badges)
+- **🪟 Close dialog** — click X to choose: minimize to tray, close app, or cancel
+- **⚙️ "Don't ask again" option** — Settings checkbox to always minimize to tray on close
 - **🔍 Multi-format parser** — supports PeerGuardian (.p2p), eMule DAT, CIDR, and plain range formats
 - **✅ Allowlist support** — DNS-resolveable domain whitelisting
 - **⚙️ Configurable cache** — LRU decision cache with adjustable TTL

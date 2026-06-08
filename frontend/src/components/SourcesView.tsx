@@ -15,9 +15,10 @@ const FORMAT_LABELS: Record<number, string> = {
 interface SourcesViewProps {
   onUpdate: () => void;
   updating: boolean;
+  rangeDiffs: Record<string, number>;
 }
 
-export function SourcesView({ onUpdate, updating }: SourcesViewProps) {
+export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps) {
   const [cfg, setCfg] = useState<config.Config | null>(null);
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -116,7 +117,14 @@ export function SourcesView({ onUpdate, updating }: SourcesViewProps) {
                     </span>
                   )}
                   {src.range_count > 0 && (
-                    <span className="source-range-count">{src.range_count.toLocaleString()} zakresów</span>
+                    <span className="source-range-count">
+                      {src.range_count.toLocaleString()} zakresów
+                      {rangeDiffs[src.name] !== undefined && (
+                        <span className={`range-diff ${rangeDiffs[src.name] > 0 ? 'up' : rangeDiffs[src.name] < 0 ? 'down' : 'same'}`}>
+                          {' '}{rangeDiffs[src.name] > 0 ? '▲' : rangeDiffs[src.name] < 0 ? '▼' : '—'} {Math.abs(rangeDiffs[src.name]).toLocaleString()}
+                        </span>
+                      )}
+                    </span>
                   )}
                   {src.last_sync && (
                     <span className="source-last-sync">

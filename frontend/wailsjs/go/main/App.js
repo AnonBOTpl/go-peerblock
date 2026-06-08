@@ -38,6 +38,10 @@ export function MinimizeToTray() {
   return window['go']['main']['App']['MinimizeToTray']();
 }
 
+export function QuitApp() {
+  return window['go']['main']['App']['QuitApp']();
+}
+
 export function ResetAllowlist() {
   return window['go']['main']['App']['ResetAllowlist']();
 }

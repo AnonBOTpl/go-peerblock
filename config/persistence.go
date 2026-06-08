@@ -3,8 +3,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Persistence handles reading and writing the config file.
@@ -63,4 +65,30 @@ func (p *Persistence) Save(cfg *Config) error {
 // ConfigPath returns the full path to the config file.
 func (p *Persistence) ConfigPath() string {
 	return p.filePath
+}
+
+// Backup creates a timestamped copy of the config file in the same directory.
+// The backup is named config.json.YYYYMMDD-HHMMSS.
+// If the config file doesn't exist yet, Backup silently does nothing.
+func (p *Persistence) Backup() error {
+	src, err := os.Open(p.filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // nothing to back up
+		}
+		return fmt.Errorf("cannot open config for backup: %w", err)
+	}
+	defer src.Close()
+
+	backupPath := p.filePath + "." + time.Now().Format("20060102-150405")
+	dst, err := os.OpenFile(backupPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("cannot create backup file: %w", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("cannot write backup: %w", err)
+	}
+	return nil
 }

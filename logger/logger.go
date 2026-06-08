@@ -48,25 +48,35 @@ type subscriber struct {
 type Logger struct {
 	ch          chan LogEntry
 	file        *os.File
+	filePath    string
 	ring        *RingBuffer
 	done        chan struct{}
 	wg          sync.WaitGroup
 	subscribers []subscriber
 	subMu       sync.Mutex
+	maxSize     int64 // 0 = no rotation
 }
 
 // NewLogger creates a new async logger writing to the given file path.
-func NewLogger(filePath string, ringSize int) (*Logger, error) {
+// maxSizeMB controls log rotation (0 = no rotation).
+func NewLogger(filePath string, ringSize int, maxSizeMB int) (*Logger, error) {
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open log file: %w", err)
 	}
 
+	var maxSize int64
+	if maxSizeMB > 0 {
+		maxSize = int64(maxSizeMB) * 1024 * 1024
+	}
+
 	l := &Logger{
-		ch:   make(chan LogEntry, 1024),
-		file: file,
-		ring: NewRingBuffer(ringSize),
-		done: make(chan struct{}),
+		ch:       make(chan LogEntry, 1024),
+		file:     file,
+		filePath: filePath,
+		ring:     NewRingBuffer(ringSize),
+		done:     make(chan struct{}),
+		maxSize:  maxSize,
 	}
 
 	l.wg.Add(1)
@@ -149,6 +159,7 @@ func (l *Logger) run() {
 		select {
 		case entry := <-l.ch:
 			l.ring.Add(entry)
+			l.rotateIfNeeded()
 			_, _ = fmt.Fprintf(l.file, "[%s] %s %s\n",
 				entry.Timestamp.Format("2006-01-02 15:04:05"),
 				entry.Level,
@@ -169,6 +180,7 @@ func (l *Logger) run() {
 				select {
 				case entry := <-l.ch:
 					l.ring.Add(entry)
+					l.rotateIfNeeded()
 					_, _ = fmt.Fprintf(l.file, "[%s] %s %s\n",
 						entry.Timestamp.Format("2006-01-02 15:04:05"),
 						entry.Level,
@@ -189,4 +201,39 @@ func (l *Logger) run() {
 			}
 		}
 	}
+}
+
+// rotateIfNeeded checks if the log file exceeds the maximum size and rotates it.
+func (l *Logger) rotateIfNeeded() {
+	if l.maxSize <= 0 {
+		return
+	}
+	fi, err := l.file.Stat()
+	if err != nil {
+		return
+	}
+	if fi.Size() < l.maxSize {
+		return
+	}
+
+	// Close current file
+	l.file.Close()
+
+	// Rename to timestamped backup
+	ts := time.Now().Format("20060102-150405")
+	backupPath := l.filePath + "." + ts
+	os.Rename(l.filePath, backupPath)
+
+	// Open new file
+	file, err := os.OpenFile(l.filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		// Fall back to the backup name — log to stderr
+		fmt.Fprintf(os.Stderr, "logger: cannot create new log file after rotation: %v\n", err)
+		// Try to reopen the old file
+		if oldFile, err := os.OpenFile(backupPath, os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			l.file = oldFile
+		}
+		return
+	}
+	l.file = file
 }

@@ -23,6 +23,8 @@ export function LookupBlockSource(arg1:string):Promise<Array<string>>;
 
 export function MinimizeToTray():Promise<void>;
 
+export function QuitApp():Promise<void>;
+
 export function ResetAllowlist():Promise<void>;
 
 export function SaveConfig(arg1:config.Config):Promise<void>;

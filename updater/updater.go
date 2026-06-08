@@ -16,15 +16,17 @@ type LogFunc func(format string, args ...interface{})
 
 // Updater orchestrates periodic IP list updates.
 type Updater struct {
-	sources       []Source
-	fetcher       *Fetcher
-	onReload      ReloadFunc
-	logFn         LogFunc
-	interval      time.Duration
-	manualTrigger chan struct{}
-	mu            sync.Mutex
-	running       bool
-	sourceRanges  map[string][]core.IPRange
+	sources         []Source
+	fetcher          *Fetcher
+	onReload         ReloadFunc
+	logFn            LogFunc
+	interval         time.Duration
+	manualTrigger    chan struct{}
+	mu               sync.Mutex
+	running          bool
+	sourceRanges     map[string][]core.IPRange
+	prevRangeCounts  map[string]int
+	rangeDiffs       map[string]int
 }
 
 // NewUpdater creates a new Updater.
@@ -119,11 +121,28 @@ func (u *Updater) IsRunning() bool {
 	return u.running
 }
 
+// GetRangeDiffs returns the difference in range counts from the last update.
+func (u *Updater) GetRangeDiffs() map[string]int {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	result := make(map[string]int, len(u.rangeDiffs))
+	for k, v := range u.rangeDiffs {
+		result[k] = v
+	}
+	return result
+}
+
 func (u *Updater) updateAll(silent bool) {
 	// Copy sources under lock, then fetch without holding the lock
 	u.mu.Lock()
 	sources := make([]Source, len(u.sources))
 	copy(sources, u.sources)
+
+	// Save previous range counts before updating
+	u.prevRangeCounts = make(map[string]int)
+	for _, s := range u.sources {
+		u.prevRangeCounts[s.Name] = s.RangeCount
+	}
 	u.mu.Unlock()
 
 	now := time.Now()
@@ -159,6 +178,18 @@ func (u *Updater) updateAll(silent bool) {
 	// Store per-source ranges before merge (for source lookup I2)
 	u.mu.Lock()
 	u.sourceRanges = perSource
+
+	// Compute range diffs per source
+	u.rangeDiffs = make(map[string]int)
+	for i := range sources {
+		if sources[i].LastSync.IsZero() && !silent {
+			// Source failed — skip diff
+			continue
+		}
+		prev := u.prevRangeCounts[sources[i].Name]
+		u.rangeDiffs[sources[i].Name] = sources[i].RangeCount - prev
+	}
+
 	u.mu.Unlock()
 
 	// Lock only for the final merge + reload (fast operation)

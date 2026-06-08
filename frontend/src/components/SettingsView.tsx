@@ -12,6 +12,7 @@ export function SettingsView() {
   const [logLevel, setLogLevel] = useState('info');
   const [startWithSystem, setStartWithSystem] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +31,7 @@ export function SettingsView() {
       setLogLevel(c.log_level || 'info');
       setStartWithSystem(!!c.start_with_system);
       setNotificationsEnabled(c.notifications_enabled !== false);
+      setMinimizeToTrayOnClose(!!c.minimize_to_tray_on_close);
     } catch (err) {
       console.error('load config error', err);
     }
@@ -69,6 +71,7 @@ export function SettingsView() {
         log_level: logLevel,
         start_with_system: startWithSystem,
         notifications_enabled: notificationsEnabled,
+        minimize_to_tray_on_close: minimizeToTrayOnClose,
       });
       await SaveConfig(updated);
       setCfg(updated);
@@ -214,6 +217,24 @@ export function SettingsView() {
               <span className="toggle-indicator" />
             </span>
             <span>Powiadom o zakończeniu aktualizacji list IP</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>Zamykanie aplikacji</h3>
+        <div className="settings-row">
+          <span className="settings-label">Przycisk X</span>
+          <label className="settings-checkbox-label source-toggle">
+            <input
+              type="checkbox"
+              checked={minimizeToTrayOnClose}
+              onChange={e => setMinimizeToTrayOnClose(e.target.checked)}
+            />
+            <span className="toggle-track">
+              <span className="toggle-indicator" />
+            </span>
+            <span>Nie pytaj — minimalizuj do tray</span>
           </label>
         </div>
       </div>

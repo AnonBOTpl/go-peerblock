@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import appIcon from './assets/ikona.png';
-import { GetStats, GetLogs, GetConfig, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetCacheInfo, MinimizeToTray } from "../wailsjs/go/main/App";
+import { GetStats, GetLogs, GetConfig, IsProtectionEnabled, ToggleProtection, TriggerUpdate, GetDatabaseInfo, GetCacheInfo, MinimizeToTray, QuitApp } from "../wailsjs/go/main/App";
 import { EventsOn, InitializeNotifications, SendNotification, CleanupNotifications } from '../wailsjs/runtime/runtime';
 import { filter, logger } from "../wailsjs/go/models";
 import { Dashboard } from './components/Dashboard';
@@ -30,6 +30,8 @@ function App() {
   const prevStatsRef = useRef<Stats | null>(null);
   const prevTimeRef = useRef<number>(0);
   const collectingRef = useRef(false);
+  const [rangeDiffs, setRangeDiffs] = useState<Record<string, number>>({});
+  const [closeDialog, setCloseDialog] = useState(false);
   // Pomija pierwszy event update-status (startowy), żeby nie wysyłać toasta przy starcie
   const startupRef = useRef(true);
 
@@ -115,8 +117,16 @@ function App() {
       setCacheInfo(info);
     });
 
+    const cancelCloseRequest = EventsOn("close-request", () => {
+      setCloseDialog(true);
+    });
+
     const cancelUpdateStatus = EventsOn("update-status", async (data: any) => {
       setUpdating(false);
+      // Store range diffs for SourcesView badges
+      if (data?.diffs) {
+        setRangeDiffs(data.diffs);
+      }
       // Skip the first event (startup update) — nie wysyłamy toasta przy starcie
       if (startupRef.current) {
         startupRef.current = false;
@@ -143,6 +153,7 @@ function App() {
       cancelDbInfo();
       cancelCacheInfo();
       cancelUpdateStatus();
+      cancelCloseRequest();
       CleanupNotifications().catch(() => {});
     };
   }, [refresh]);
@@ -229,11 +240,37 @@ function App() {
             protected_={protected_} onToggle={handleToggle}
           />
         )}
-        {tab === 'sources' && <SourcesView onUpdate={handleUpdate} updating={updating} />}
+        {tab === 'sources' && <SourcesView onUpdate={handleUpdate} updating={updating} rangeDiffs={rangeDiffs} />}
         {tab === 'settings' && <SettingsView />}
         {tab === 'charts' && <ChartsView history={history} blockedEntries={blockedEntries} />}
         <LogView logs={logs} onClear={handleClearLogs} />
       </main>
+
+      {/* Close dialog */}
+      {closeDialog && (
+        <div className="modal-overlay" onClick={() => setCloseDialog(false)}>
+          <div className="modal modal-close" onClick={e => e.stopPropagation()}>
+            <div className="modal-body">
+              <div className="close-dialog-icon">❓</div>
+              <p className="close-dialog-title">Co chcesz zrobić?</p>
+              <p className="close-dialog-desc">
+                Aplikacja będzie nadal działać w zasobniku systemowym i blokować pakiety.
+              </p>
+              <div className="close-dialog-actions">
+                <button className="close-dialog-btn tray" onClick={() => { setCloseDialog(false); MinimizeToTray(); }}>
+                  ⬇ Do tray
+                </button>
+                <button className="close-dialog-btn quit" onClick={() => { setCloseDialog(false); QuitApp(); }}>
+                  ✕ Zamknij aplikację
+                </button>
+                <button className="close-dialog-btn cancel" onClick={() => setCloseDialog(false)}>
+                  Anuluj
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="status-bar">
         <span className={`status-dot ${protected_ ? 'active' : 'inactive'}`} />

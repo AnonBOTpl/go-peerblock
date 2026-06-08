@@ -20,6 +20,9 @@
 - **🔍 Podgląd źródła blokady** — kliknij na zablokowane IP, by zobaczyć które listy je blokują
 - **📋 Statystyki per lista** — ile zakresów pochodzi z każdego źródła w zakładce Źródła
 - **🔔 Powiadomienia Windows** — toast na pulpicie gdy listy się zaktualizują (można wyłączyć w ustawieniach)
+- **📊 Diff zakresów** — po aktualizacji widać ile zakresów doszło/ubyło per źródło (▲/▼)
+- **🪟 Okno zamykania** — kliknij X by wybrać: minimalizuj do tray, zamknij aplikację lub anuluj
+- **⚙️ Opcja "Nie pytaj"** — checkbox w Ustawieniach by zawsze minimalizować do tray
 - **🔍 Parser wielu formatów** — obsługa PeerGuardian (.p2p), eMule DAT, CIDR i zakresów
 - **✅ Allowlista** — whitelistowanie domen z resolwowaniem DNS
 - **⚙️ Konfigurowalny cache** — LRU cache decyzji z regulowanym TTL

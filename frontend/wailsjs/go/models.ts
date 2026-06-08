@@ -5,6 +5,7 @@ export namespace config {
 	    start_minimized: boolean;
 	    start_with_system: boolean;
 	    notifications_enabled: boolean;
+	    minimize_to_tray_on_close: boolean;
 	    worker_count: number;
 	    cache_size: number;
 	    cache_ttl: number;
@@ -24,6 +25,7 @@ export namespace config {
 	        this.start_minimized = source["start_minimized"];
 	        this.start_with_system = source["start_with_system"];
 	        this.notifications_enabled = source["notifications_enabled"];
+	        this.minimize_to_tray_on_close = source["minimize_to_tray_on_close"];
 	        this.worker_count = source["worker_count"];
 	        this.cache_size = source["cache_size"];
 	        this.cache_ttl = source["cache_ttl"];

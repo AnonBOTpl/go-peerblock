@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"fmt"
 	"log"
@@ -16,6 +17,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -60,6 +62,20 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 59, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
+		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			// Jeśli app już zamyka (QuitApp), przepuść bez dialogu
+			if app.isQuitting() {
+				return false
+			}
+			// Jeśli użytkownik zaznaczył "Nie pytaj więcej", minimalizuj od razu
+			if app.cfg.MinimizeToTrayOnClose {
+				wailsRuntime.WindowHide(ctx)
+				return true
+			}
+			// Wyślij event do frontendu — pokażemy custom modal z wyborem
+			wailsRuntime.EventsEmit(ctx, "close-request")
+			return true // prevent close — frontend zdecyduje przez QuitApp lub MinimizeToTray
+		},
 		Bind: []interface{}{
 			app,
 		},
