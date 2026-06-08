@@ -55,6 +55,7 @@ func TestUpdater_UpdateAll_MultipleSources(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -106,6 +107,7 @@ func TestUpdater_UpdateAll_PartialFailure(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -143,6 +145,7 @@ func TestUpdater_UpdateAll_AllFail(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -174,6 +177,7 @@ func TestUpdater_UpdateAll_SourceRanges(t *testing.T) {
 		func(db *core.IPDatabase) {},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -231,6 +235,7 @@ func TestUpdater_UpdateAll_DisabledSources(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -259,6 +264,7 @@ func TestUpdater_UpdateAll_LastSyncUpdated(t *testing.T) {
 		func(db *core.IPDatabase) {},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -294,6 +300,7 @@ func TestUpdater_ConcurrentTriggerManual(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	// Run the updater (does initial updateAll)
@@ -348,6 +355,7 @@ func TestUpdater_UpdateAll_NoSources(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -387,6 +395,7 @@ func TestUpdater_UpdateAll_P2PFormat(t *testing.T) {
 		},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	u.updateAll(false)
@@ -430,6 +439,7 @@ func BenchmarkUpdater_UpdateAll(b *testing.B) {
 		func(db *core.IPDatabase) {},
 		func(format string, args ...interface{}) {},
 		24*time.Hour,
+		"en",
 	)
 
 	b.ResetTimer()

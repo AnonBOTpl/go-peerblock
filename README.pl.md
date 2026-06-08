@@ -196,6 +196,56 @@ go build ./...
 CGO_ENABLED=1 go build -tags windivert ./...
 ```
 
+## Rozwiązywanie problemów
+
+### Sterownik WinDivert
+
+Aplikacja używa **sterownika jądra WinDivert** do przechwytywania i filtrowania pakietów sieciowych. Sterownik musi być uruchomiony, aby blokowanie działało.
+
+#### Aplikacja nie uruchamia się po restarcie
+
+Jeśli aplikacja nie chce wystartować po restarcie systemu z błędem:
+```
+Startup error: cannot install WinDivert driver: sc start WinDivert failed
+```
+
+Oznacza to, że wpis serwisu WinDivert istnieje, ale wskazuje na plik sterownika (`WinDivert64.sys`), który już nie istnieje (np. ścieżka wskazywała na folder Temp, który został wyczyszczony podczas restartu).
+
+**Rozwiązanie:** Zainstaluj ponownie aplikację za pomocą instalatora NSIS. Nowy instalator rejestruje sterownik z `start= auto`, co zapewnia automatyczne uruchamianie przy bootowaniu. Jeśli nie możesz reinstalować od razu, uruchom następujące polecenia jako **Administrator**:
+
+```batch
+sc stop WinDivert
+sc delete WinDivert
+sc create WinDivert type= kernel start= auto binPath= "C:\Program Files\go-peerblock\WinDivert64.sys"
+sc start WinDivert
+```
+
+*(Dostosuj `binPath` do swojego katalogu instalacji.)*
+
+#### Sprawdzenie statusu sterownika
+
+Aby sprawdzić czy sterownik WinDivert działa, otwórz Wiersz Poleceń jako Administrator i uruchom:
+
+```batch
+sc query WinDivert
+```
+
+Jeśli wynik pokazuje `STATE: 4 RUNNING`, sterownik działa poprawnie. Jeśli widzisz `STOPPED`, sterownik jest zainstalowany ale nie uruchomiony.
+
+#### Sterownik nie startuje automatycznie po reinstalacji
+
+Jeśli zainstalowałeś aplikację ale sterownik nie uruchamia się automatycznie po restarcie, instalator mógł zarejestrować sterownik z `start= demand` zamiast `start= auto`. Zostało to naprawione w najnowszej wersji instalatora. Uruchom ponownie instalator, aby zaktualizować rejestrację sterownika, lub zmień typ uruchamiania ręcznie:
+
+```batch
+sc config WinDivert start= auto
+```
+
+#### Uruchamianie jako Administrator
+
+Zarówno aplikacja jak i sterownik WinDivert **muszą** być uruchomione z uprawnieniami administratora. Jeśli widzisz błędy związane z uprawnieniami, kliknij prawym przyciskiem na plik wykonywalny i wybierz **"Uruchom jako administrator"**.
+
+---
+
 ## Licencja
 
 Projekt na licencji MIT — szczegóły w pliku [LICENSE](LICENSE).

@@ -132,14 +132,73 @@ func isDriverLoaded(name string) bool {
 	return bytes.Contains(out, []byte("RUNNING"))
 }
 
+// isDriverInstalled checks if a Windows service/driver entry exists (regardless of state).
+func isDriverInstalled(name string) bool {
+	out, err := exec.Command("sc", "query", name).Output()
+	if err != nil {
+		return false
+	}
+	return len(out) > 0 && !bytes.Contains(out, []byte("FAILED")) &&
+		bytes.Contains(out, []byte(name))
+}
+
+// findSysPath searches for WinDivert64.sys in execDir() and the current directory.
+func findSysPath() string {
+	// During runtime (installed app): same dir as the executable
+	sysPath := filepath.Join(execDir(), "WinDivert64.sys")
+	if _, err := os.Stat(sysPath); err == nil {
+		return sysPath
+	}
+	// During development (wails build, go run): current working directory
+	if wd, err := os.Getwd(); err == nil && wd != execDir() {
+		sysPath = filepath.Join(wd, "WinDivert64.sys")
+		if _, err := os.Stat(sysPath); err == nil {
+			return sysPath
+		}
+	}
+	// Fallback: return execDir() path anyway (caller will handle errors)
+	return filepath.Join(execDir(), "WinDivert64.sys")
+}
+
+// removeDriverService stops and deletes an existing (possibly broken) WinDivert service entry.
+func removeDriverService() {
+	exec.Command("sc", "stop", "WinDivert").Run()
+	// Small sleep to let Windows process the stop
+	_ = exec.Command("cmd", "/C", "timeout", "/t", "1", "/nobreak").Run()
+	exec.Command("sc", "delete", "WinDivert").Run()
+}
+
 // installDriver installs and starts the WinDivert kernel driver.
 func installDriver() error {
-	batPath := filepath.Join(execDir(), "build", "installer", "install-driver.bat")
-	cmd := exec.Command("cmd", "/C", batPath)
-	cmd.Dir = execDir()
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("install-driver failed: %w\nOutput: %s", err, out)
+	sysPath := findSysPath()
+
+	// Try to start existing service first
+	if isDriverInstalled("WinDivert") {
+		if _, err := exec.Command("sc", "start", "WinDivert").CombinedOutput(); err != nil {
+			// Existing service has a broken binPath (e.g. file in Temp was deleted)
+			// Remove it and recreate below
+			removeDriverService()
+		} else {
+			return nil
+		}
 	}
+
+	// Register the driver
+	out, err := exec.Command("sc", "create", "WinDivert",
+		"type=", "kernel",
+		"start=", "demand",
+		"binPath=", sysPath,
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("sc create WinDivert failed: %w\nOutput: %s", err, out)
+	}
+
+	// Start the driver
+	out, err = exec.Command("sc", "start", "WinDivert").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("sc start WinDivert failed: %w\nOutput: %s", err, out)
+	}
+
 	return nil
 }
 

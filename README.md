@@ -216,6 +216,56 @@ go build ./...                          # Noop mode
 CGO_ENABLED=1 go build -tags windivert ./...  # Production mode
 ```
 
+## Troubleshooting
+
+### WinDivert driver issues
+
+The application uses the **WinDivert kernel driver** to capture and filter network packets. The driver must be running for packet blocking to work.
+
+#### App won't start after reboot
+
+If the application fails to start after a system restart with an error like:
+```
+Startup error: cannot install WinDivert driver: sc start WinDivert failed
+```
+
+This usually means the WinDivert service entry exists but points to a driver file (`WinDivert64.sys`) that no longer exists (e.g., the path was set to a temporary location that was cleared on reboot).
+
+**Solution:** Reinstall the application using the NSIS installer. The new installer registers the driver with `start= auto`, which ensures it starts automatically on boot. If you cannot reinstall right away, run the following commands as **Administrator**:
+
+```batch
+sc stop WinDivert
+sc delete WinDivert
+sc create WinDivert type= kernel start= auto binPath= "C:\Program Files\go-peerblock\WinDivert64.sys"
+sc start WinDivert
+```
+
+*(Adjust the `binPath` to match your installation directory.)*
+
+#### Check driver status
+
+To verify the WinDivert driver status, open Command Prompt as Administrator and run:
+
+```batch
+sc query WinDivert
+```
+
+If the output shows `STATE: 4 RUNNING`, the driver is working correctly. If it shows `STOPPED`, the driver is installed but not running.
+
+#### Driver doesn't auto-start after fresh install
+
+If you installed the application but the driver didn't auto-start after reboot, the installer may have registered the driver with `start= demand` instead of `start= auto`. This was fixed in the latest installer version. Run the installer again to update the driver registration, or manually change the start type:
+
+```batch
+sc config WinDivert start= auto
+```
+
+#### Run as Administrator
+
+The application and the WinDivert driver **must** be run with administrator privileges. If you see any permission-related errors, right-click the executable and select **"Run as administrator"**.
+
+---
+
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

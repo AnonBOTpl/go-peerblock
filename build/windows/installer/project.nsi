@@ -102,7 +102,7 @@ Section "go-peerblock" SecMain
     Sleep 500
 
     # Zarejestruj nowy sterownik (binPath musi wskazywać na absolutną ścieżkę)
-    ExecWait 'sc create WinDivert type= kernel start= demand binPath= "$INSTDIR\WinDivert64.sys"' $0
+    ExecWait 'sc create WinDivert type= kernel start= auto binPath= "$INSTDIR\WinDivert64.sys"' $0
     ${If} $0 != 0
         DetailPrint "UWAGA: sc create WinDivert zwrócił kod $0 (może być już zarejestrowany)"
     ${EndIf}
