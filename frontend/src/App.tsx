@@ -9,6 +9,7 @@ import { SourcesView } from './components/SourcesView';
 import { SettingsView } from './components/SettingsView';
 import { LogView } from './components/LogView';
 import { ChartsView, type Sample, type BlockedEntry } from './components/ChartsView';
+import { I18nProvider, useT, type Lang } from './i18n';
 
 type Stats = filter.Stats;
 type LogEntry = logger.LogEntry;
@@ -16,7 +17,8 @@ type Tab = 'dashboard' | 'sources' | 'settings' | 'charts';
 
 // ─── Main App ────────────────────────────────────────────
 
-function App() {
+function AppInner() {
+  const { t, setLang, lang } = useT();
   const [stats, setStats] = useState<Stats | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [protected_, setProtected_] = useState(false);
@@ -133,14 +135,13 @@ function App() {
         return;
       }
       if (!data?.ranges) return;
-      // Sprawdź aktualne ustawienie z configu (SettingsView mogło je zmienić)
       try {
         const cfg = await GetConfig();
         if (cfg.notifications_enabled !== false) {
           await SendNotification({
             id: 'update-complete',
             title: 'GO PeerBlock',
-            body: `Listy IP zaktualizowane: ${data.ranges.toLocaleString()} zakresów`,
+            body: t('notification.body', { ranges: data.ranges.toLocaleString() }),
           });
         }
       } catch {}
@@ -197,18 +198,34 @@ function App() {
     setBlockedEntries([]);
   };
 
+  const [appLang, setAppLang] = useState<Lang>('en');
+
+  // Load language from backend config on startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await GetConfig();
+        const savedLang = (cfg as any).language as Lang;
+        if (savedLang === 'pl' || savedLang === 'en') {
+          setAppLang(savedLang);
+          setLang(savedLang);
+        }
+      } catch {}
+    })();
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-left">
           <img className="app-logo" src={appIcon} alt="GO PeerBlock" />
-          <span className="app-subtitle">IP Blocker dla Windows</span>
+          <span className="app-subtitle">{t('app.subtitle')}</span>
         </div>
         <div className="header-right">
-          <button className="update-btn" onClick={handleUpdate} title="Aktualizuj listy IP" disabled={updating}>
-            {updating ? '⏳' : '↻'} Aktualizuj
+          <button className="update-btn" onClick={handleUpdate} title={t('app.update.title')} disabled={updating}>
+            {updating ? '⏳' : '↻'} {t('app.update')}
           </button>
-          <button className="tray-btn" onClick={MinimizeToTray} title="Minimalizuj do zasobnika">
+          <button className="tray-btn" onClick={MinimizeToTray} title={t('app.tray.title')}>
             ⬇
           </button>
         </div>
@@ -218,19 +235,19 @@ function App() {
         <button
           className={`tab-btn ${tab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setTab('dashboard')}
-        >📊 Dashboard</button>
+        >{t('tab.dashboard')}</button>
         <button
           className={`tab-btn ${tab === 'sources' ? 'active' : ''}`}
           onClick={() => setTab('sources')}
-        >📋 Źródła list IP</button>
+        >{t('tab.sources')}</button>
         <button
           className={`tab-btn ${tab === 'charts' ? 'active' : ''}`}
           onClick={() => setTab('charts')}
-        >📈 Wykresy</button>
+        >{t('tab.charts')}</button>
         <button
           className={`tab-btn ${tab === 'settings' ? 'active' : ''}`}
           onClick={() => setTab('settings')}
-        >⚙️ Ustawienia</button>
+        >{t('tab.settings')}</button>
       </nav>
 
       <main className="app-main">
@@ -241,7 +258,7 @@ function App() {
           />
         )}
         {tab === 'sources' && <SourcesView onUpdate={handleUpdate} updating={updating} rangeDiffs={rangeDiffs} />}
-        {tab === 'settings' && <SettingsView />}
+        {tab === 'settings' && <SettingsView onLanguageChange={setLang} />}
         {tab === 'charts' && <ChartsView history={history} blockedEntries={blockedEntries} />}
         <LogView logs={logs} onClear={handleClearLogs} />
       </main>
@@ -252,19 +269,19 @@ function App() {
           <div className="modal modal-close" onClick={e => e.stopPropagation()}>
             <div className="modal-body">
               <div className="close-dialog-icon">❓</div>
-              <p className="close-dialog-title">Co chcesz zrobić?</p>
+              <p className="close-dialog-title">{t('closeDialog.title')}</p>
               <p className="close-dialog-desc">
-                Aplikacja będzie nadal działać w zasobniku systemowym i blokować pakiety.
+                {t('closeDialog.desc')}
               </p>
               <div className="close-dialog-actions">
                 <button className="close-dialog-btn tray" onClick={() => { setCloseDialog(false); MinimizeToTray(); }}>
-                  ⬇ Do tray
+                  {t('closeDialog.tray')}
                 </button>
                 <button className="close-dialog-btn quit" onClick={() => { setCloseDialog(false); QuitApp(); }}>
-                  ✕ Zamknij aplikację
+                  {t('closeDialog.quit')}
                 </button>
                 <button className="close-dialog-btn cancel" onClick={() => setCloseDialog(false)}>
-                  Anuluj
+                  {t('closeDialog.cancel')}
                 </button>
               </div>
             </div>
@@ -274,7 +291,7 @@ function App() {
 
       <footer className="status-bar">
         <span className={`status-dot ${protected_ ? 'active' : 'inactive'}`} />
-        <span>{protected_ ? 'Ochrona aktywna' : 'Ochrona wyłączona'}</span>
+        <span>{protected_ ? t('protection.active') : t('protection.inactive')}</span>
         {stats && (() => {
           const total = stats.blocked + stats.allowed;
           const elapsed = stats.started_at > 0
@@ -283,15 +300,23 @@ function App() {
           const pps = elapsed > 0 ? (total / elapsed).toFixed(1) : '0.0';
           return (
             <span className="status-fps">
-              Pakiety: {total.toLocaleString()} ({pps}/s)
+              {t('status.packets', { total: total.toLocaleString(), pps })}
             </span>
           );
         })()}
         <span className="status-tab">{
-          tab === 'dashboard' ? 'Dashboard' : tab === 'sources' ? 'Źródła' : tab === 'charts' ? 'Wykresy' : 'Ustawienia'
+          tab === 'dashboard' ? t('status.tab.dashboard') : tab === 'sources' ? t('status.tab.sources') : tab === 'charts' ? t('status.tab.charts') : t('status.tab.settings')
         }</span>
       </footer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <I18nProvider initialLang="en">
+      <AppInner />
+    </I18nProvider>
   );
 }
 

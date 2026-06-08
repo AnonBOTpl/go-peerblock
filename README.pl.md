@@ -23,6 +23,10 @@
 - **📊 Diff zakresów** — po aktualizacji widać ile zakresów doszło/ubyło per źródło (▲/▼)
 - **🪟 Okno zamykania** — kliknij X by wybrać: minimalizuj do tray, zamknij aplikację lub anuluj
 - **⚙️ Opcja "Nie pytaj"** — checkbox w Ustawieniach by zawsze minimalizować do tray
+- **🌍 Wielojęzyczne UI** — polski i angielski interfejs z auto-wykrywaniem języka systemu Windows
+- **🗺️ Własne tłumaczenia** — dodaj własny język przez `frontend/src/i18n/{lang}.ts`
+- **🔤 Tłumaczone opisy źródeł** — opisy list blokad w odpowiednim języku
+- **🔤 Logi w języku aplikacji** — logi backendu przełączają się między PL/EN wg ustawienia
 - **🔍 Parser wielu formatów** — obsługa PeerGuardian (.p2p), eMule DAT, CIDR i zakresów
 - **✅ Allowlista** — whitelistowanie domen z resolwowaniem DNS
 - **⚙️ Konfigurowalny cache** — LRU cache decyzji z regulowanym TTL

@@ -18,6 +18,10 @@ export function GetDatabaseInfo() {
   return window['go']['main']['App']['GetDatabaseInfo']();
 }
 
+export function GetLanguage() {
+  return window['go']['main']['App']['GetLanguage']();
+}
+
 export function GetLogs(arg1) {
   return window['go']['main']['App']['GetLogs'](arg1);
 }

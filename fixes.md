@@ -83,6 +83,8 @@
 - [x] **A13** README zaktualizowany — dodane nowe features (notyfikacje, podgląd źródła, statystyki per lista, wykres blokad)
 - [ ] **I4** Harmonogram aktualizacji — opcja "aktualizuj o konkretnej godzinie" (np. 3:00)
 - [x] **I5** Auto-backup config — `Persistence.Backup()` kopiuje `config.json` do `config.json.YYYYMMDD-HHMMSS` przed każdą aktualizacją list
+- [x] **🌍 i18n Full** — polski i angielski interfejs (React context + hook), auto-wykrywanie języka systemu Windows, przełącznik PL/EN w Ustawieniach
+- [x] **🔤 Backend i18n** — logi backendu tłumaczone przez `i18n.T(lang, key)`, opisy źródeł zawsze po angielsku w backendzie, tłumaczone przez frontend wg języka
 
 ### 🟢 Koncepcyjne / przyszłe
 

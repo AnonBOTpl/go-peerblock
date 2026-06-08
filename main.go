@@ -29,8 +29,8 @@ var appIconData []byte
 func main() {
 	// Check admin rights and WinDivert driver
 	if err := checkAdminAndDriver(); err != nil {
-		log.Fatalf("Błąd uruchomienia: %v\n"+
-			"Uruchom aplikację jako Administrator.", err)
+		log.Fatalf("Startup error: %v\n"+
+			"Run the application as Administrator.", err)
 	}
 
 	// Create application instance
@@ -87,7 +87,7 @@ func main() {
 	})
 
 	if err != nil {
-		log.Fatalf("Błąd uruchomienia Wails: %v", err)
+		log.Fatalf("Wails startup error: %v", err)
 	}
 
 	// Wails exited (window closed). Signal systray to quit and wait.
@@ -98,16 +98,16 @@ func main() {
 // checkAdminAndDriver verifies admin privileges and WinDivert driver.
 func checkAdminAndDriver() error {
 	if runtime.GOOS != "windows" {
-		return fmt.Errorf("aplikacja wymaga systemu Windows")
+		return fmt.Errorf("application requires Windows")
 	}
 
 	if !isAdmin() {
-		return fmt.Errorf("aplikacja wymaga uprawnień administratora")
+		return fmt.Errorf("application requires administrator privileges")
 	}
 
 	if !isDriverLoaded("WinDivert") {
 		if err := installDriver(); err != nil {
-			return fmt.Errorf("nie można zainstalować sterownika WinDivert: %w", err)
+			return fmt.Errorf("cannot install WinDivert driver: %w", err)
 		}
 	}
 

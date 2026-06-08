@@ -1,3 +1,4 @@
+import { useT } from '../i18n';
 import type { filter } from '../../wailsjs/go/models';
 import { StatCard } from './StatCard';
 
@@ -13,6 +14,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ stats, uptime, dbInfo, cacheInfo, protected_, onToggle }: DashboardProps) {
+  const { t } = useT();
   const blockedRate = stats && (stats.blocked + stats.allowed) > 0
     ? ((stats.blocked / (stats.blocked + stats.allowed)) * 100).toFixed(1)
     : '0.0';
@@ -26,20 +28,20 @@ export function Dashboard({ stats, uptime, dbInfo, cacheInfo, protected_, onTogg
         >
           <div className="toggle-knob" />
           <span className="toggle-label">
-            {protected_ ? 'Ochrona aktywna' : 'Ochrona wyłączona'}
+            {protected_ ? t('protection.active') : t('protection.inactive')}
           </span>
         </button>
       </div>
 
       <div className="stats-grid">
-        <StatCard label="Zablokowane" value={stats?.blocked ?? 0} color="#ef4444" />
-        <StatCard label="Przepuszczone" value={stats?.allowed ?? 0} color="#22c55e" />
-        <StatCard label="Współczynnik blokad" value={blockedRate} unit="%" color="#f59e0b" />
-        <StatCard label="Zakresy IP" value={dbInfo['ranges'] ?? 0} color="#3b82f6" />
-        <StatCard label="Uptime" value={uptime} color="#8b5cf6" />
-        <StatCard label="Upuszczone" value={stats?.dropped ?? 0} color="#64748b" />
+        <StatCard label={t('dashboard.blocked')} value={stats?.blocked ?? 0} color="#ef4444" />
+        <StatCard label={t('dashboard.allowed')} value={stats?.allowed ?? 0} color="#22c55e" />
+        <StatCard label={t('dashboard.blockedRate')} value={blockedRate} unit="%" color="#f59e0b" />
+        <StatCard label={t('dashboard.ipRanges')} value={dbInfo['ranges'] ?? 0} color="#3b82f6" />
+        <StatCard label={t('dashboard.uptime')} value={uptime} color="#8b5cf6" />
+        <StatCard label={t('dashboard.dropped')} value={stats?.dropped ?? 0} color="#64748b" />
         <StatCard
-          label="Cache"
+          label={t('dashboard.cache')}
           value={`${(cacheInfo['entries'] ?? 0).toLocaleString()} / ${(cacheInfo['max'] ?? 65536).toLocaleString()}`}
           color="#64748b"
         />

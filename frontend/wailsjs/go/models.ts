@@ -14,6 +14,8 @@ export namespace config {
 	    log_max_size_mb: number;
 	    sources: updater.Source[];
 	    allowlist: string[];
+	    custom_rules: string[];
+	    language: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -34,6 +36,8 @@ export namespace config {
 	        this.log_max_size_mb = source["log_max_size_mb"];
 	        this.sources = this.convertValues(source["sources"], updater.Source);
 	        this.allowlist = source["allowlist"];
+	        this.custom_rules = source["custom_rules"];
+	        this.language = source["language"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -1,3 +1,5 @@
+import { useT } from '../i18n';
+
 interface SourceDialogProps {
   ip: string;
   sources: string[];
@@ -5,11 +7,12 @@ interface SourceDialogProps {
 }
 
 export function SourceDialog({ ip, sources, onClose }: SourceDialogProps) {
+  const { t } = useT();
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-source" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Źródła blokady</h3>
+          <h3>{t('sourceDialog.title')}</h3>
           <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -18,9 +21,9 @@ export function SourceDialog({ ip, sources, onClose }: SourceDialogProps) {
             <span className="source-dialog-value">{ip}</span>
           </p>
           <div className="source-dialog-list">
-            <p className="source-dialog-list-label">Blokowany przez:</p>
+            <p className="source-dialog-list-label">{t('sourceDialog.blockedBy')}</p>
             {sources.length === 0 ? (
-              <p className="source-dialog-empty">Brak dopasowanych źródeł</p>
+              <p className="source-dialog-empty">{t('sourceDialog.empty')}</p>
             ) : (
               sources.map((name, i) => (
                 <div key={i} className="source-dialog-item">
@@ -32,7 +35,7 @@ export function SourceDialog({ ip, sources, onClose }: SourceDialogProps) {
           </div>
         </div>
         <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Zamknij</button>
+          <button className="btn-secondary" onClick={onClose}>{t('sourceDialog.close')}</button>
         </div>
       </div>
     </div>

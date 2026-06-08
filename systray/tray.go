@@ -22,6 +22,7 @@ type App interface {
 	GetCtx() context.Context
 	IsProtectionEnabled() bool
 	ToggleProtection()
+	GetLanguage() string
 }
 
 // RunTray starts the system tray icon loop.
@@ -50,12 +51,24 @@ func setupMenu(app App) {
 		systray.SetTitle("GO PeerBlock")
 	}
 
-	mShow := systray.AddMenuItem("Pokaż okno", "Open the main window")
-	mToggle := systray.AddMenuItem("Wyłącz ochronę", "Toggle protection")
-	systray.AddSeparator()
-	mQuit := systray.AddMenuItem("Zamknij", "Quit the application")
+	lang := app.GetLanguage()
+	showLabel := "Pokaż okno"
+	disableStr := "Wyłącz ochronę"
+	enableStr := "Włącz ochronę"
+	quitLabel := "Zamknij"
+	if lang == "en" {
+		showLabel = "Show window"
+		disableStr = "Disable protection"
+		enableStr = "Enable protection"
+		quitLabel = "Quit"
+	}
 
-	updateToggleLabel(mToggle, app.IsProtectionEnabled())
+	mShow := systray.AddMenuItem(showLabel, "Open the main window")
+	mToggle := systray.AddMenuItem(disableStr, "Toggle protection")
+	systray.AddSeparator()
+	mQuit := systray.AddMenuItem(quitLabel, "Quit the application")
+
+	updateToggleLabel(mToggle, app.IsProtectionEnabled(), disableStr, enableStr)
 
 	go func() {
 		for {
@@ -66,7 +79,7 @@ func setupMenu(app App) {
 				}
 			case <-mToggle.ClickedCh:
 				app.ToggleProtection()
-				updateToggleLabel(mToggle, app.IsProtectionEnabled())
+				updateToggleLabel(mToggle, app.IsProtectionEnabled(), disableStr, enableStr)
 			case <-mQuit.ClickedCh:
 				if ctx := app.GetCtx(); ctx != nil {
 					runtime.Quit(ctx)
@@ -77,10 +90,10 @@ func setupMenu(app App) {
 	}()
 }
 
-func updateToggleLabel(item *systray.MenuItem, enabled bool) {
+func updateToggleLabel(item *systray.MenuItem, enabled bool, disableStr, enableStr string) {
 	if enabled {
-		item.SetTitle("Wyłącz ochronę")
+		item.SetTitle(disableStr)
 	} else {
-		item.SetTitle("Włącz ochronę")
+		item.SetTitle(enableStr)
 	}
 }

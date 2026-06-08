@@ -1,16 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useT } from '../i18n';
 import { config, updater } from '../../wailsjs/go/models';
 import { GetConfig, SaveConfig } from '../../wailsjs/go/main/App';
 import { AddSourceDialog, AddSourceForm } from './AddSourceDialog';
 
 type Source = updater.Source;
-
-const FORMAT_LABELS: Record<number, string> = {
-  1: 'P2P Text',
-  2: 'DAT',
-  3: 'CIDR',
-  4: 'Zakres IP',
-};
 
 interface SourcesViewProps {
   onUpdate: () => void;
@@ -19,10 +13,26 @@ interface SourcesViewProps {
 }
 
 export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps) {
+  const { t } = useT();
   const [cfg, setCfg] = useState<config.Config | null>(null);
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+
+  const FORMAT_LABELS: Record<number, string> = {
+    1: t('sources.formatLabel.p2p'),
+    2: t('sources.formatLabel.dat'),
+    3: t('sources.formatLabel.cidr'),
+    4: t('sources.formatLabel.range'),
+  };
+
+  const getSourceDesc = (src: Source): string | null => {
+    const key = `source.desc.${src.name}`;
+    const translated = t(key);
+    // If key exists in translations, use it; otherwise fall back to stored description
+    if (translated !== key) return translated;
+    return src.description || null;
+  };
 
   const loadConfig = useCallback(async () => {
     try {
@@ -79,25 +89,24 @@ export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps
   };
 
   if (!cfg) {
-    return <div className="sources-loading">Ładowanie konfiguracji...</div>;
+    return <div className="sources-loading">{t('sources.loading')}</div>;
   }
 
   return (
     <div className="sources-view">
       <div className="sources-header">
-        <h2>Źródła list IP ({cfg.sources.length})</h2>
+        <h2>{t('sources.title', { count: String(cfg.sources.length) })}</h2>
         <div className="sources-actions">
           <button className="btn-secondary" onClick={() => setShowAdd(true)}>
-            + Dodaj źródło
+            {t('sources.add')}
           </button>
           <button className="update-btn" onClick={onUpdate} disabled={updating}>
-            {updating ? '⏳' : '↻'} Aktualizuj
+            {updating ? '⏳' : '↻'} {t('app.update')}
           </button>
         </div>
       </div>
       <p className="sources-desc">
-        Włącz lub wyłącz źródła blokad IP. Możesz dodać własne źródła z opcjonalnym kluczem API.
-        Kliknij "Aktualizuj teraz" aby pobrać wybrane listy.
+        {t('sources.desc')}
       </p>
       <div className="sources-list">
         {cfg.sources.map((src, i) => (
@@ -105,9 +114,10 @@ export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps
             <div className="source-main">
               <div className="source-info">
                 <div className="source-name">{src.name}</div>
-                {src.description && (
-                  <div className="source-desc">{src.description}</div>
-                )}
+                {(() => {
+                  const desc = getSourceDesc(src);
+                  return desc ? <div className="source-desc">{desc}</div> : null;
+                })()}
                 <div className="source-url" title={src.url}>{src.url}</div>
                 <div className="source-meta">
                   <span className="source-format-badge">{FORMAT_LABELS[src.format] || 'CIDR'}</span>
@@ -118,7 +128,7 @@ export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps
                   )}
                   {src.range_count > 0 && (
                     <span className="source-range-count">
-                      {src.range_count.toLocaleString()} zakresów
+                      {t('sources.ranges', { count: src.range_count.toLocaleString() })}
                       {rangeDiffs[src.name] !== undefined && (
                         <span className={`range-diff ${rangeDiffs[src.name] > 0 ? 'up' : rangeDiffs[src.name] < 0 ? 'down' : 'same'}`}>
                           {' '}{rangeDiffs[src.name] > 0 ? '▲' : rangeDiffs[src.name] < 0 ? '▼' : '—'} {Math.abs(rangeDiffs[src.name]).toLocaleString()}
@@ -128,7 +138,7 @@ export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps
                   )}
                   {src.last_sync && (
                     <span className="source-last-sync">
-                      Ostatnia: {new Date(src.last_sync).toLocaleString('pl-PL')}
+                      {t('sources.lastSync', { date: new Date(src.last_sync).toLocaleString() })}
                     </span>
                   )}
                 </div>
@@ -143,12 +153,12 @@ export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps
                   <span className="toggle-track">
                     <span className="toggle-indicator" />
                   </span>
-                  <span className="toggle-status">{src.enabled ? 'Aktywne' : 'Wył.'}</span>
+                  <span className="toggle-status">{src.enabled ? t('sources.enabled') : t('sources.disabled')}</span>
                 </label>
                 <button
                   className="source-delete-btn"
                   onClick={() => setDeletingIndex(i)}
-                  title="Usuń źródło"
+                  title={t('sources.delete.title')}
                 >
                   🗑
                 </button>
@@ -157,18 +167,18 @@ export function SourcesView({ onUpdate, updating, rangeDiffs }: SourcesViewProps
           </div>
         ))}
       </div>
-      {saving && <div className="sources-saving">Zapisywanie...</div>}
+      {saving && <div className="sources-saving">{t('sources.saving')}</div>}
 
       {/* Delete confirmation */}
       {deletingIndex !== null && (
         <div className="modal-overlay" onClick={() => setDeletingIndex(null)}>
           <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
             <p className="modal-confirm-text">
-              Usunąć źródło <strong>{cfg.sources[deletingIndex]?.name}</strong>?
+              {t('sources.delete.confirm')} <strong>{cfg.sources[deletingIndex]?.name}</strong>?
             </p>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setDeletingIndex(null)}>Anuluj</button>
-              <button className="btn-danger" onClick={() => handleDelete(deletingIndex)}>Usuń</button>
+              <button className="btn-secondary" onClick={() => setDeletingIndex(null)}>{t('sources.delete.cancel')}</button>
+              <button className="btn-danger" onClick={() => handleDelete(deletingIndex)}>{t('sources.delete.confirmBtn')}</button>
             </div>
           </div>
         </div>

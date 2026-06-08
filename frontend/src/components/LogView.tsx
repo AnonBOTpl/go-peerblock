@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useT } from '../i18n';
 import type { logger } from '../../wailsjs/go/models';
 
 type LogEntry = logger.LogEntry;
@@ -9,6 +10,7 @@ interface LogViewProps {
 }
 
 export function LogView({ logs, onClear }: LogViewProps) {
+  const { t } = useT();
   const logEndRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   // Poziomy: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
@@ -52,22 +54,22 @@ export function LogView({ logs, onClear }: LogViewProps) {
   return (
     <div className="log-view">
       <div className="log-toolbar">
-        <span className="log-title">Logi zdarzeń</span>
+        <span className="log-title">{t('log.title')}</span>
         <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className="log-filter">
-          <option value="SYSTEM">System (domyślny)</option>
-          <option value="ALL">Wszystkie + DEBUG</option>
-          <option value="BLOCKED">Blokady</option>
-          <option value="ERROR">Błędy</option>
+          <option value="SYSTEM">{t('log.filter.system')}</option>
+          <option value="ALL">{t('log.filter.all')}</option>
+          <option value="BLOCKED">{t('log.filter.blocked')}</option>
+          <option value="ERROR">{t('log.filter.errors')}</option>
         </select>
         <label className="log-autoscroll">
           <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
-          Auto-scroll
+          {t('log.autoscroll')}
         </label>
-        <button className="log-clear-btn" onClick={onClear}>Wyczyść</button>
+        <button className="log-clear-btn" onClick={onClear}>{t('log.clear')}</button>
       </div>
       <div className="log-entries">
         {filteredLogs.length === 0 ? (
-          <div className="log-empty">Brak zdarzeń...</div>
+          <div className="log-empty">{t('log.empty')}</div>
         ) : (
           filteredLogs.map((e, i) => (
             <div key={i} className={`log-entry ${getLevelClass(e.level, e.message)}`}>

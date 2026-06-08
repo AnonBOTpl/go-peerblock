@@ -23,6 +23,10 @@
 - **📊 Range diffs** — after each update, see how many ranges were added/removed per source (▲/▼ badges)
 - **🪟 Close dialog** — click X to choose: minimize to tray, close app, or cancel
 - **⚙️ "Don't ask again" option** — Settings checkbox to always minimize to tray on close
+- **🌍 Multi-language UI** — Polish and English UI with auto-detection of Windows system language
+- **🗺️ User-translatable** — add your own language by editing `frontend/src/i18n/{lang}.ts`
+- **🔤 Translated source descriptions** — source descriptions in the correct language
+- **🔤 Language-aware logs** — backend logs switch between PL and EN based on selected language
 - **🔍 Multi-format parser** — supports PeerGuardian (.p2p), eMule DAT, CIDR, and plain range formats
 - **✅ Allowlist support** — DNS-resolveable domain whitelisting
 - **⚙️ Configurable cache** — LRU decision cache with adjustable TTL

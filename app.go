@@ -6,17 +6,20 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"go-peerblock/config"
 	"go-peerblock/core"
 	"go-peerblock/filter"
+	"go-peerblock/i18n"
 	"go-peerblock/logger"
 	"go-peerblock/updater"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/sys/windows/registry"
+	"syscall"
 )
 
 // App is the main application struct, binding Go methods to the Wails frontend.
@@ -34,6 +37,7 @@ type App struct {
 	logSubCh      chan logger.LogEntry
 	eventsDone    chan struct{}
 	sourceRanges  map[string][]core.IPRange
+	customRanges  []core.IPRange
 	quitting      atomic.Bool
 }
 
@@ -50,10 +54,18 @@ func (a *App) startup(ctx context.Context) {
 	a.configP = config.NewPersistence()
 	cfg, err := a.configP.Load()
 	if err != nil {
-		runtime.LogError(ctx, "Nie można załadować konfiguracji: "+err.Error())
+		runtime.LogError(ctx, i18n.T("en", "app.config.load.error", err.Error()))
 		cfg = config.Defaults()
 	}
 	a.cfg = cfg
+
+	// Auto-detect system language if not set
+	if a.cfg.Language == "" || (a.cfg.Language != "pl" && a.cfg.Language != "en") {
+		a.cfg.Language = a.detectSystemLanguage()
+	}
+
+	// Parse custom rules from config
+	a.customRanges = parseCustomRuleLines(a.cfg.CustomRules)
 
 	// Initialize logger
 	logDir := filepath.Join(getAppDataDir(), "logs")
@@ -61,10 +73,10 @@ func (a *App) startup(ctx context.Context) {
 	logPath := filepath.Join(logDir, "peerblock.log")
 	logger, err := logger.NewLogger(logPath, 5000, cfg.LogMaxSizeMB)
 	if err != nil {
-		runtime.LogError(ctx, "Nie można utworzyć loggera: "+err.Error())
+		runtime.LogError(ctx, i18n.T("en", "app.logger.create.error", err.Error()))
 	}
 	a.logger = logger
-	a.logger.Info("go-peerblock uruchomiony")
+	a.logger.Info(i18n.T(a.GetLanguage(), "app.started"))
 
 	// Forward log entries to frontend in real-time via Wails events
 	a.logSubCh = a.logger.Subscribe()
@@ -97,7 +109,19 @@ func (a *App) startup(ctx context.Context) {
 	fetcher := updater.NewFetcher(filepath.Join(getAppDataDir(), "cache"))
 	a.updater = updater.NewUpdater(cfg.Sources, fetcher,
 		func(newDB *core.IPDatabase) {
-			// Clear before Store to prevent workers from caching old DB results
+			// Get per-source ranges first (needed for custom rules merge)
+		a.sourceRanges = a.updater.GetSourceRanges()
+
+			// Merge custom rules into the database
+		if len(a.customRanges) > 0 {
+			var allRanges []core.IPRange
+			for _, ranges := range a.sourceRanges {
+				allRanges = append(allRanges, ranges...)
+			}
+			allRanges = append(allRanges, a.customRanges...)
+			newDB = core.NewDatabase(allRanges)
+		}
+
 		a.cache.Clear() // O(1) version increment — stale entries become invisible
 		a.db.Store(newDB)
 			// Sync LastSync from updater back to config so GUI sees correct dates
@@ -112,13 +136,12 @@ func (a *App) startup(ctx context.Context) {
 				}
 				// Backup config before saving (I5 — auto-backup przed aktualizacją)
 				if err := a.configP.Backup(); err != nil {
-					a.logger.Warn("Nie można utworzyć kopii zapasowej configu: %v", err)
+					a.logger.Warn(i18n.T(a.GetLanguage(), "app.config.backup.error", err))
 				}
 				_ = a.configP.Save(a.cfg)
 			}
-			a.logger.Info("Baza IP przeładowana: %d zakresów", len(newDB.Ranges()))
-			// Save per-source ranges for source lookup (I2)
-			a.sourceRanges = a.updater.GetSourceRanges()
+			a.logger.Info(i18n.T(a.GetLanguage(), "app.db.reloaded", len(newDB.Ranges())))
+			// Source ranges already saved at the top of this callback
 			// Notify frontend about the database and cache changes
 			runtime.EventsEmit(a.ctx, "db-info", a.GetDatabaseInfo())
 			runtime.EventsEmit(a.ctx, "cache-info", a.GetCacheInfo())
@@ -134,6 +157,7 @@ func (a *App) startup(ctx context.Context) {
 			a.logger.Debug(format, args...)
 		},
 		cfg.UpdateInterval,
+		a.GetLanguage(),
 	)
 	go a.updater.Run(ctx)
 
@@ -237,7 +261,7 @@ func (a *App) ToggleProtection() {
 	if a.pipeline != nil && a.pipeline.IsRunning() {
 		a.pipeline.Close()
 		a.pipeline = nil
-		a.logger.Info("Ochrona wyłączona")
+		a.logger.Info(i18n.T(a.GetLanguage(), "app.protection.disabled"))
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "protection", false)
 		}
@@ -271,6 +295,11 @@ func (a *App) GetConfig() config.Config {
 // SaveConfig saves a new configuration.
 func (a *App) SaveConfig(cfg config.Config) error {
 	*a.cfg = cfg
+
+	// Re-parse custom rules and rebuild database
+	a.customRanges = parseCustomRuleLines(cfg.CustomRules)
+	a.rebuildDB()
+
 	if a.updater != nil {
 		a.updater.RefreshSources(cfg.Sources)
 	}
@@ -357,6 +386,61 @@ func (a *App) isQuitting() bool {
 	return a.quitting.Load()
 }
 
+// GetLanguage returns the current interface language.
+func (a *App) GetLanguage() string {
+	if a.cfg == nil {
+		return "en"
+	}
+	return a.cfg.Language
+}
+
+// detectSystemLanguage detects the Windows UI language.
+func (a *App) detectSystemLanguage() string {
+	// Kernel32.GetUserDefaultUILanguage returns the default UI language ID
+	mod := syscall.NewLazyDLL("kernel32.dll")
+	proc := mod.NewProc("GetUserDefaultUILanguage")
+	ret, _, _ := proc.Call()
+	langID := uint16(ret)
+	primary := langID & 0x3FF
+	if primary == 0x15 {
+		return "pl"
+	}
+	return "en"
+}
+
+// rebuildDB rebuilds the IP database from source ranges + custom rules.
+// Called after SaveConfig (custom rules changed) or when needed.
+func (a *App) rebuildDB() {
+	var allRanges []core.IPRange
+	for _, ranges := range a.sourceRanges {
+		allRanges = append(allRanges, ranges...)
+	}
+	allRanges = append(allRanges, a.customRanges...)
+	db := core.NewDatabase(allRanges)
+	a.cache.Clear()
+	a.db.Store(db)
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "db-info", a.GetDatabaseInfo())
+	}
+}
+
+// parseCustomRuleLines parses custom rule strings (CIDR, bare IP, range) into a merged IPRange slice.
+func parseCustomRuleLines(lines []string) []core.IPRange {
+	if len(lines) == 0 {
+		return nil
+	}
+	var buf strings.Builder
+	for _, line := range lines {
+		buf.WriteString(line)
+		buf.WriteByte('\n')
+	}
+	ranges, err := core.Parse([]byte(buf.String()), core.FormatCIDR)
+	if err != nil {
+		return nil
+	}
+	return core.MergeRanges(ranges)
+}
+
 // --- Internal helpers ---
 
 func (a *App) startProtection() {
@@ -373,10 +457,10 @@ func (a *App) startProtection() {
 
 	wd, err := filter.Open(filter.DefaultFilter(), 0, 0) // layer=0 (Network), priority=0
 	if err != nil {
-		a.logger.Error("Nie można otworzyć WinDivert: %v", err)
+		a.logger.Error(i18n.T(a.GetLanguage(), "app.windivert.open.error", err))
 		return
 	}
-	a.logger.Debug("WinDivert otwarty: %s", filter.DefaultFilter())
+	a.logger.Debug(i18n.T(a.GetLanguage(), "app.windivert.opened", filter.DefaultFilter()))
 
 	a.pipeline = filter.NewPipeline(wd, &a.db, a.cache, a.allowlist, workerCount)
 	a.pipeline.SetOnBlock(func(srcIP, dstIP uint32, proto uint8) {
@@ -394,7 +478,7 @@ func (a *App) startProtection() {
 		a.logger.Info("BLOCK %s → %s [%s]", src, dst, protoName)
 	})
 	a.pipeline.Start()
-	a.logger.Info("Ochrona włączona (%d workerów)", workerCount)
+	a.logger.Info(i18n.T(a.GetLanguage(), "app.protection.enabled", workerCount))
 	// Notify frontend
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "protection", true)
@@ -407,7 +491,7 @@ func (a *App) applyAutostart() {
 	keyPath := `Software\Microsoft\Windows\CurrentVersion\Run`
 	k, err := registry.OpenKey(registry.CURRENT_USER, keyPath, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
-		a.logger.Error("Nie można otworzyć klucza rejestru autostart: %v", err)
+		a.logger.Error(i18n.T(a.GetLanguage(), "app.autostart.open.error", err))
 		return
 	}
 	defer k.Close()
@@ -415,19 +499,19 @@ func (a *App) applyAutostart() {
 	if a.cfg.StartWithSystem {
 		exePath, err := os.Executable()
 		if err != nil {
-			a.logger.Error("Nie można pobrać ścieżki exe dla autostart: %v", err)
+			a.logger.Error(i18n.T(a.GetLanguage(), "app.autostart.path.error", err))
 			return
 		}
 		if err := k.SetStringValue("go-peerblock", exePath); err != nil {
-			a.logger.Error("Nie można ustawić autostart w rejestrze: %v", err)
+			a.logger.Error(i18n.T(a.GetLanguage(), "app.autostart.set.error", err))
 		} else {
-			a.logger.Debug("Autostart włączony: %s", exePath)
+			a.logger.Debug(i18n.T(a.GetLanguage(), "app.autostart.enabled", exePath))
 		}
 	} else {
 		if err := k.DeleteValue("go-peerblock"); err != nil && err != registry.ErrNotExist {
-			a.logger.Error("Nie można usunąć autostart z rejestru: %v", err)
+			a.logger.Error(i18n.T(a.GetLanguage(), "app.autostart.delete.error", err))
 		} else {
-			a.logger.Debug("Autostart wyłączony")
+			a.logger.Debug(i18n.T(a.GetLanguage(), "app.autostart.disabled"))
 		}
 	}
 }

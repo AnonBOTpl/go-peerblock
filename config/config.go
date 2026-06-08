@@ -21,6 +21,8 @@ type Config struct {
 	LogMaxSizeMB        int              `json:"log_max_size_mb"`
 	Sources             []updater.Source `json:"sources"`
 	Allowlist           []string         `json:"allowlist"`
+	CustomRules         []string         `json:"custom_rules"`
+	Language            string           `json:"language"`
 }
 
 // Defaults returns the default configuration.
@@ -38,6 +40,8 @@ func Defaults() *Config {
 		LogLevel:             "info",
 		LogMaxSizeMB:         10,
 		Sources:              updater.DefaultSources,
+		Language:            "en",
+		CustomRules: nil,
 		Allowlist: []string{
 			"8.8.8.8",
 			"8.8.4.4",

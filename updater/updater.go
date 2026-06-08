@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go-peerblock/core"
+	"go-peerblock/i18n"
 )
 
 // ReloadFunc is called when the database is updated.
@@ -21,6 +22,7 @@ type Updater struct {
 	onReload         ReloadFunc
 	logFn            LogFunc
 	interval         time.Duration
+	lang             string
 	manualTrigger    chan struct{}
 	mu               sync.Mutex
 	running          bool
@@ -30,7 +32,7 @@ type Updater struct {
 }
 
 // NewUpdater creates a new Updater.
-func NewUpdater(sources []Source, fetcher *Fetcher, onReload ReloadFunc, logFn LogFunc, interval time.Duration) *Updater {
+func NewUpdater(sources []Source, fetcher *Fetcher, onReload ReloadFunc, logFn LogFunc, interval time.Duration, lang string) *Updater {
 	if interval <= 0 {
 		interval = 24 * time.Hour
 	}
@@ -40,6 +42,7 @@ func NewUpdater(sources []Source, fetcher *Fetcher, onReload ReloadFunc, logFn L
 		onReload:      onReload,
 		logFn:         logFn,
 		interval:      interval,
+		lang:          lang,
 		manualTrigger: make(chan struct{}, 1),
 	}
 }
@@ -78,13 +81,13 @@ func (u *Updater) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			u.logf("Zaplanowana aktualizacja list IP...")
+			u.logf("updater.scheduled")
 			u.updateAll(false)
 		case <-u.manualTrigger:
-			u.logf("Ręczne wyzwolenie aktualizacji...")
+			u.logf("updater.manual")
 			u.updateAll(false)
 		case <-ctx.Done():
-			u.logf("Aktualizator zatrzymany")
+			u.logf("updater.stopped")
 			return
 		}
 	}
@@ -155,14 +158,14 @@ func (u *Updater) updateAll(silent bool) {
 		data, err := u.fetcher.Fetch(src)
 		if err != nil {
 			if !silent {
-				u.logf("Nie można pobrać %s: %v", src.Name, err)
+				u.logf("updater.fetch.error", src.Name, err)
 			}
 			continue
 		}
 		ranges, err := core.Parse(data, core.Format(src.Format))
 		if err != nil {
 			if !silent {
-				u.logf("Błąd parsowania %s: %v", src.Name, err)
+				u.logf("updater.parse.error", src.Name, err)
 			}
 			continue
 		}
@@ -170,8 +173,7 @@ func (u *Updater) updateAll(silent bool) {
 		allRanges = append(allRanges, ranges...)
 		sources[i].LastSync = now
 		sources[i].RangeCount = len(ranges)
-		if !silent {
-			u.logf("Załadowano %d zakresów z %s", len(ranges), src.Name)
+		if !silent {				u.logf("updater.loaded", len(ranges), src.Name)
 		}
 	}
 
@@ -208,12 +210,13 @@ func (u *Updater) updateAll(silent bool) {
 		u.onReload(newDB)
 	}
 	if !silent {
-		u.logf("Baza IP przeładowana: %d zakresów (po merge'u)", len(newDB.Ranges()))
+		u.logf("updater.db.reloaded", len(newDB.Ranges()))
 	}
 }
 
-func (u *Updater) logf(format string, args ...interface{}) {
+func (u *Updater) logf(key string, args ...interface{}) {
 	if u.logFn != nil {
-		u.logFn(format, args...)
+		msg := i18n.T(u.lang, key, args...)
+		u.logFn("%s", msg)
 	}
 }

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useT } from '../i18n';
 import { SourceDialog } from './SourceDialog';
 import { LookupBlockSource } from '../../wailsjs/go/main/App';
 import {
@@ -46,12 +47,6 @@ interface ChartsViewProps {
 
 type Range = 5 | 10 | 30;
 
-const RANGES: { value: Range; label: string }[] = [
-  { value: 5, label: '5 min' },
-  { value: 10, label: '10 min' },
-  { value: 30, label: '30 min' },
-];
-
 function formatTime(ts: number): string {
   const d = new Date(ts);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -63,6 +58,12 @@ function formatBlockTime(ts: number): string {
 }
 
 export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
+  const { t } = useT();
+  const RANGES: { value: Range; label: string }[] = [
+    { value: 5, label: t('charts.range.5min') },
+    { value: 10, label: t('charts.range.10min') },
+    { value: 30, label: t('charts.range.30min') },
+  ];
   const [timeRange, setTimeRange] = useState<Range>(5);
   const [dialogIP, setDialogIP] = useState<string | null>(null);
   const [dialogSources, setDialogSources] = useState<string[]>([]);
@@ -78,7 +79,7 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
     labels: filtered.map(h => formatTime(h.time)),
     datasets: [
       {
-        label: 'Blokowane',
+        label: t('charts.chart.blocked'),
         data: filtered.map(h => h.blockedPPS),
         borderColor: '#ef4444',
         backgroundColor: 'rgba(239, 68, 68, 0.08)',
@@ -89,7 +90,7 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
         borderWidth: 2,
       },
       {
-        label: 'Przepuszczone',
+        label: t('charts.chart.allowed'),
         data: filtered.map(h => h.allowedPPS),
         borderColor: '#22c55e',
         backgroundColor: 'rgba(34, 197, 94, 0.08)',
@@ -193,7 +194,7 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
   return (
     <div className="charts-view">
       <div className="charts-header">
-        <h2>Wykres ruchu</h2>
+        <h2>{t('charts.title')}</h2>
         <div className="chart-range-buttons">
           {RANGES.map(r => (
             <button
@@ -210,8 +211,8 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
       {filtered.length < 2 ? (
         <div className="charts-empty">
           <div className="charts-empty-icon">📈</div>
-          <div className="charts-empty-text">Zbieranie danych...</div>
-          <div className="charts-empty-hint">Wykres pojawi się za chwilę, gdy zgromadzimy wystarczająco próbek.</div>
+          <div className="charts-empty-text">{t('charts.empty.title')}</div>
+          <div className="charts-empty-hint">{t('charts.empty.hint')}</div>
         </div>
       ) : (
         <div className="chart-container">
@@ -222,11 +223,11 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
       {/* Blocked IPs list */}
       <div className="blocked-list">
         <div className="blocked-list-header">
-          <h3>Ostatnie blokady</h3>
+          <h3>{t('charts.blocked.list')}</h3>
           <span className="blocked-list-count">{blockedEntries.length}</span>
         </div>
         {blockedEntries.length === 0 ? (
-          <div className="blocked-list-empty">Brak zablokowanych pakietów. Włącz ochronę aby zobaczyć listę.</div>
+          <div className="blocked-list-empty">{t('charts.blocked.empty')}</div>
         ) : (
           <div className="blocked-list-entries">
             {blockedEntries.map((entry) => (
@@ -234,7 +235,7 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
                   key={entry.id}
                   className="blocked-entry"
                   onClick={() => handleBlockClick(entry)}
-                  title="Kliknij aby sprawdzić źródło blokady"
+                  title={t('charts.blocked.title')}
                 >
                   <span className="blocked-time">{formatBlockTime(entry.timestamp)}</span>
                   <span className="blocked-ips">
@@ -254,7 +255,7 @@ export function ChartsView({ history, blockedEntries }: ChartsViewProps) {
       {dialogIP && (
         <SourceDialog
           ip={dialogIP}
-          sources={loadingSource ? ['Szukanie źródeł...'] : dialogSources}
+          sources={loadingSource ? [t('charts.searching')] : dialogSources}
           onClose={handleCloseDialog}
         />
       )}

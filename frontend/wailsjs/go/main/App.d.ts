@@ -13,6 +13,8 @@ export function GetCtx():Promise<context.Context>;
 
 export function GetDatabaseInfo():Promise<Record<string, any>>;
 
+export function GetLanguage():Promise<string>;
+
 export function GetLogs(arg1:number):Promise<Array<logger.LogEntry>>;
 
 export function GetStats():Promise<filter.Stats>;
