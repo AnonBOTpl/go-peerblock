@@ -40,7 +40,7 @@ func Defaults() *Config {
 		LogLevel:             "info",
 		LogMaxSizeMB:         10,
 		Sources:              updater.DefaultSources,
-		Language:            "en",
+		Language:            "",
 		CustomRules: nil,
 		Allowlist: []string{
 			"8.8.8.8",

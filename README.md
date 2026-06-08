@@ -27,6 +27,8 @@
 - **🗺️ User-translatable** — add your own language by editing `frontend/src/i18n/{lang}.ts`
 - **🔤 Translated source descriptions** — source descriptions in the correct language
 - **🔤 Language-aware logs** — backend logs switch between PL and EN based on selected language
+- **📦 NSIS installer** — full installer with WinDivert driver setup/cleanup, WebView2 bootstrap, bilingual (PL/EN)
+- **📄 MIT License in installer** — license page with AnonBOTpl copyright and GitHub link, requires acceptance
 - **🔍 Multi-format parser** — supports PeerGuardian (.p2p), eMule DAT, CIDR, and plain range formats
 - **✅ Allowlist support** — DNS-resolveable domain whitelisting
 - **⚙️ Configurable cache** — LRU decision cache with adjustable TTL
@@ -157,6 +159,8 @@ go-peerblock/
 │   ├── pipeline_noop.go     # Noop pipeline stub
 │   ├── shared.go            # Shared types (Packet, Stats, ParseIPHeader)
 │   └── workerpool.go        # Worker count calculation
+├── i18n/                    # Backend translations (T() helper, EN/PL maps)
+│   └── i18n.go
 ├── updater/                 # IP list updates
 │   ├── updater.go           # Update orchestrator
 │   ├── sources.go           # Default source definitions
@@ -184,11 +188,15 @@ go-peerblock/
 │       │   ├── SourceDialog.tsx    # Block source lookup results modal
 │       │   └── ConfigView.tsx      # Config file viewer
 ├── build/
-│   ├── windows/             # UAC manifest
-│   └── installer/           # NSIS installer + driver script
-├── WinDivert.dll            # WinDivert runtime
-├── WinDivert64.sys          # WinDivert kernel driver
-└── windivert.h              # WinDivert C header
+│   ├── windows/
+│   │   ├── icon.ico         # App icon
+│   │   ├── license.txt      # MIT License for installer
+│   │   ├── info.json        # Wails metadata
+│   │   └── installer/
+│   │       └── project.nsi  # NSIS installer script (WinDivert, WebView2)
+│   ├── appicon.png           # Icon source for Wails
+│   └── README.md
+├── windivert.h              # WinDivert C header (needed for CGO)
 ```
 
 ## Tests

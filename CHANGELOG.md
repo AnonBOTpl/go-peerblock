@@ -4,6 +4,74 @@ All notable changes to this project will be documented in this file.
 
 > 🇵🇱 [Polska wersja](CHANGELOG.pl.md)
 
+## [0.4.0] — 2026-06-08
+
+### Added
+
+#### Multi-language UI (PL/EN)
+- `frontend/src/i18n/index.tsx` — `I18nProvider` + `useT()` hook with React context, params interpolation, fallback to English
+- `frontend/src/i18n/pl.ts`, `frontend/src/i18n/en.ts` — ~120 translation keys each for the entire UI
+- All components: `App.tsx`, `Dashboard.tsx`, `SourcesView.tsx`, `SettingsView.tsx`, `LogView.tsx`, `ChartsView.tsx`, `AddSourceDialog.tsx`, `SourceDialog.tsx` — migrated from hardcoded strings to `t()` calls
+- `config/config.go` — `Language string` field, defaults to `""` (triggers autodetection)
+- `app.go` — `detectSystemLanguage()` using `windows.GetUserPreferredUILanguages()`, auto-detects PL system language
+- `SettingsView.tsx` — language selector dropdown (PL/EN) with backend save
+
+#### Backend i18n (language-aware logs)
+- `i18n/i18n.go` — new package: `T(lang, key, args...)` with EN/PL maps (~25 keys each)
+- `app.go` — all `Info/Warn/Error/Debug` calls use `i18n.T(a.GetLanguage(), ...)`
+- `updater/updater.go` — `logf()` translates via `i18n.T(u.lang, ...)`, accepts `lang` parameter from caller
+- `main.go` — startup error messages in English (before app initialization)
+- `systray/tray.go` — tray menu uses `i18n.T(lang, key)` instead of hardcoded if-else branching
+
+#### Custom user rules (I7)
+- `SettingsView.tsx` — new textarea in Ustawienia for custom CIDR/IP/range rules
+- `app.go` — `parseCustomRuleLines()` parses and merges custom rules into the IP database
+- Config saved to `config.json` and reloaded on startup
+
+#### NSIS installer with WinDivert
+- `build/windows/installer/project.nsi` — custom installer script with WinDivert driver handling
+- `build/windows/license.txt` — MIT License displayed in installer with Copyright (c) 2026 AnonBOTpl + GitHub link
+- Optional desktop shortcut via Components page (unchecked by default)
+- Start menu shortcut created always
+- Driver installed: `sc create` + `sc start` on install
+- Driver removed: `sc stop` + `sc delete` on uninstall
+- WebView2 Runtime bootstrap via Wails
+- AppData (`%APPDATA%`) preserved on uninstall
+- Bilingual installer (English + Polish)
+
+### Changed
+
+#### Source descriptions always in English
+- `updater/sources.go` — all 9 default source descriptions translated to English
+- `frontend/src/i18n/pl.ts`, `frontend/src/i18n/en.ts` — 10 `source.desc.{name}` keys for translated display in GUI
+- `SourcesView.tsx` — `getSourceDesc()` helper shows translated description or falls back to stored value for custom sources
+
+#### Install directory fixed
+- `build/windows/installer/project.nsi` — changed from `$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}` to `$PROGRAMFILES64\${INFO_PRODUCTNAME}`
+- Resolves double directory issue: now `C:\Program Files\go-peerblock\` instead of `C:\Program Files\go-peerblock\go-peerblock\`
+
+#### Git tracking cleanup
+- `.gitignore` — new patterns for `build/windows/installer/tmp/`, `build/windows/*.manifest`, `build/darwin/`, `build/installer/`, audit/plan files
+- Removed from git: `WinDivert.dll`, `WinDivert64.sys`, `build/installer/`, `build/windows/*.manifest`, `build/darwin/`, audit/plan files, `test-blocklist.txt`, `frontend/package.json.md5`
+- Kept: `windivert.h` (C header), `build/windows/info.json` (Wails metadata)
+- Repository now contains only source code, config, documentation, and essential build resources (~81 files)
+
+### Fixed
+
+#### Audit fixes (all 9 items from go-peerblock-audit-final.md)
+
+| # | File | Fix |
+|---|---|---|
+| 1 | `updater/updater.go` | `NewDatabase(allRanges)` moved outside `u.mu.Lock()` — lock held for less time |
+| 2 | `app.go` | `a.sourceRanges` changed from raw map to `atomic.Pointer` — eliminates race condition |
+| 3 | `logger/logger.go` | `rotateIfNeeded()` called every 100 writes instead of every log entry |
+| 4 | `systray/tray.go` + `i18n/i18n.go` | Systray menu now uses `i18n.T()` with proper language keys |
+| 5 | `core/allowlist.go` | `isIPString()` now checks `ip.To4() != nil` — rejects IPv6 addresses, safe nil check |
+| 6 | `app.go` | `syscall.NewLazyDLL` → `windows.GetUserPreferredUILanguages()` |
+| 7 | `updater/updater.go` | `logf()` removed redundant `"%s"` wrapper — passes formatted message directly |
+| 8 | `updater/fetcher.go` | `io.LimitReader(resp.Body, 100MB)` limits HTTP download size |
+| 9 | `config/config.go` | `Defaults()` sets `Language: ""` sentinel — triggers autodetection on clean install |
+
 ## [0.3.0] — 2026-06-07
 
 ### Added

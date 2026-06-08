@@ -6,6 +6,7 @@ import (
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"go-peerblock/i18n"
 )
 
 // appIconData stores the application icon (ICO bytes) passed from main.
@@ -42,7 +43,7 @@ func QuitTray() {
 }
 
 func setupMenu(app App) {
-	systray.SetTooltip("GO PeerBlock - IP Filter")
+	systray.SetTooltip(i18n.T(app.GetLanguage(), "systray.tooltip"))
 
 	// Set the tray icon from pre-converted ICO bytes
 	if len(appIconData) > 0 {
@@ -52,23 +53,13 @@ func setupMenu(app App) {
 	}
 
 	lang := app.GetLanguage()
-	showLabel := "Pokaż okno"
-	disableStr := "Wyłącz ochronę"
-	enableStr := "Włącz ochronę"
-	quitLabel := "Zamknij"
-	if lang == "en" {
-		showLabel = "Show window"
-		disableStr = "Disable protection"
-		enableStr = "Enable protection"
-		quitLabel = "Quit"
-	}
 
-	mShow := systray.AddMenuItem(showLabel, "Open the main window")
-	mToggle := systray.AddMenuItem(disableStr, "Toggle protection")
+	mShow := systray.AddMenuItem(i18n.T(lang, "systray.show"), "Open the main window")
+	mToggle := systray.AddMenuItem(i18n.T(lang, "systray.disable"), "Toggle protection")
 	systray.AddSeparator()
-	mQuit := systray.AddMenuItem(quitLabel, "Quit the application")
+	mQuit := systray.AddMenuItem(i18n.T(lang, "systray.quit"), "Quit the application")
 
-	updateToggleLabel(mToggle, app.IsProtectionEnabled(), disableStr, enableStr)
+	updateToggleLabel(mToggle, app.IsProtectionEnabled(), i18n.T(lang, "systray.disable"), i18n.T(lang, "systray.enable"))
 
 	go func() {
 		for {
@@ -79,7 +70,8 @@ func setupMenu(app App) {
 				}
 			case <-mToggle.ClickedCh:
 				app.ToggleProtection()
-				updateToggleLabel(mToggle, app.IsProtectionEnabled(), disableStr, enableStr)
+				curLang := app.GetLanguage()
+				updateToggleLabel(mToggle, app.IsProtectionEnabled(), i18n.T(curLang, "systray.disable"), i18n.T(curLang, "systray.enable"))
 			case <-mQuit.ClickedCh:
 				if ctx := app.GetCtx(); ctx != nil {
 					runtime.Quit(ctx)

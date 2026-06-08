@@ -55,6 +55,7 @@ type Logger struct {
 	subscribers []subscriber
 	subMu       sync.Mutex
 	maxSize     int64 // 0 = no rotation
+	writeCount  int64 // counter to throttle rotateIfNeeded checks
 }
 
 // NewLogger creates a new async logger writing to the given file path.
@@ -159,7 +160,10 @@ func (l *Logger) run() {
 		select {
 		case entry := <-l.ch:
 			l.ring.Add(entry)
-			l.rotateIfNeeded()
+			l.writeCount++
+			if l.writeCount%100 == 0 {
+				l.rotateIfNeeded()
+			}
 			_, _ = fmt.Fprintf(l.file, "[%s] %s %s\n",
 				entry.Timestamp.Format("2006-01-02 15:04:05"),
 				entry.Level,
@@ -180,7 +184,10 @@ func (l *Logger) run() {
 				select {
 				case entry := <-l.ch:
 					l.ring.Add(entry)
-					l.rotateIfNeeded()
+					l.writeCount++
+					if l.writeCount%100 == 0 {
+						l.rotateIfNeeded()
+					}
 					_, _ = fmt.Fprintf(l.file, "[%s] %s %s\n",
 						entry.Timestamp.Format("2006-01-02 15:04:05"),
 						entry.Level,

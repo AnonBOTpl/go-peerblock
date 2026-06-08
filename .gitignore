@@ -1,17 +1,22 @@
 # ─── Binaries ─────────────────────────────────────────
 *.exe
 *.exe~
-*.syso
 *.dll
-!WinDivert.dll
 *.so
 *.dylib
 *.sys
-!WinDivert64.sys
+*.syso
 
 # ─── Build output ─────────────────────────────────────
 build/bin/
 frontend/dist/
+
+# ─── Build artifacts (generated) ─────────────────────
+build/windows/installer/tmp/
+build/windows/installer/wails_tools.nsh
+build/windows/*.manifest
+build/darwin/
+build/installer/
 
 # ─── Dependencies ─────────────────────────────────────
 node_modules/
@@ -37,6 +42,19 @@ logs/
 WinDivert-*.zip
 WinDivert-*/
 
+# ─── Temp / Debug / Test files ───────────────────────
+firehol_temp.txt
+test-list-discord-facebook.txt
+test-blocklist.txt
+
+# ─── Audit / planning (not source) ──────────────────
+go-peerblock-audit*.md
+go-peerblock-plan.md
+obserwacje.md
+
+# ─── Task instructions ──────────────────────────────
+instalator task i pliki/
+
 # ─── OS ───────────────────────────────────────────────
 .DS_Store
 Thumbs.db
@@ -49,6 +67,3 @@ Thumbs.db
 
 # ─── Env ──────────────────────────────────────────────
 .env
-
-# ─── Temp / Debug ────────────────────────────────────
-firehol_temp.txt

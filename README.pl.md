@@ -27,6 +27,8 @@
 - **🗺️ Własne tłumaczenia** — dodaj własny język przez `frontend/src/i18n/{lang}.ts`
 - **🔤 Tłumaczone opisy źródeł** — opisy list blokad w odpowiednim języku
 - **🔤 Logi w języku aplikacji** — logi backendu przełączają się między PL/EN wg ustawienia
+- **📦 Instalator NSIS** — pełny instalator z instalacją/usuwaniem sterownika WinDivert, WebView2 bootstrap, dwujęzyczny
+- **📄 Licencja MIT w instalatorze** — strona licencji z copyright AnonBOTpl i linkiem GitHub, wymaga akceptacji
 - **🔍 Parser wielu formatów** — obsługa PeerGuardian (.p2p), eMule DAT, CIDR i zakresów
 - **✅ Allowlista** — whitelistowanie domen z resolwowaniem DNS
 - **⚙️ Konfigurowalny cache** — LRU cache decyzji z regulowanym TTL
@@ -148,6 +150,8 @@ go-peerblock/
 │   ├── windivert_noop.go    # Stub noop (tag: !windivert)
 │   ├── pipeline.go          # Wielowątkowy pipeline
 │   └── ...
+├── i18n/                    # Backend tłumaczenia (T() helper, mapy EN/PL)
+│   └── i18n.go
 ├── updater/                 # Aktualizacje list IP
 ├── logger/                  # Asynchroniczne logowanie
 ├── config/                  # Konfiguracja
@@ -166,8 +170,16 @@ go-peerblock/
 │       │   ├── AddSourceDialog.tsx # Dodawanie nowego źródła
 │       │   ├── SourceDialog.tsx    # Wyniki podglądu źródła blokady
 │       │   └── ConfigView.tsx      # Podgląd pliku konfiguracyjnego
-├── build/                   # Manifest UAC + instalator NSIS
-└── WinDivert.*              # SDK WinDivert
+├── build/
+│   ├── windows/
+│   │   ├── icon.ico         # Ikona aplikacji
+│   │   ├── license.txt      # Licencja MIT dla instalatora
+│   │   ├── info.json        # Metadane Wails
+│   │   └── installer/
+│   │       └── project.nsi  # Skrypt instalatora NSIS (WinDivert, WebView2)
+│   ├── appicon.png           # Źródło ikony dla Wails
+│   └── README.md
+└── windivert.h              # Nagłówek C WinDivert (wymagany do CGO)
 ```
 
 ## Testy

@@ -18,8 +18,8 @@ import (
 	"go-peerblock/updater"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"syscall"
 )
 
 // App is the main application struct, binding Go methods to the Wails frontend.
@@ -36,7 +36,7 @@ type App struct {
 	allowlistDone  chan struct{}
 	logSubCh      chan logger.LogEntry
 	eventsDone    chan struct{}
-	sourceRanges  map[string][]core.IPRange
+	sourceRanges  atomic.Pointer[map[string][]core.IPRange]
 	customRanges  []core.IPRange
 	quitting      atomic.Bool
 }
@@ -110,13 +110,17 @@ func (a *App) startup(ctx context.Context) {
 	a.updater = updater.NewUpdater(cfg.Sources, fetcher,
 		func(newDB *core.IPDatabase) {
 			// Get per-source ranges first (needed for custom rules merge)
-		a.sourceRanges = a.updater.GetSourceRanges()
+		srcRanges := a.updater.GetSourceRanges()
+		a.sourceRanges.Store(&srcRanges)
 
 			// Merge custom rules into the database
 		if len(a.customRanges) > 0 {
 			var allRanges []core.IPRange
-			for _, ranges := range a.sourceRanges {
-				allRanges = append(allRanges, ranges...)
+			srcRng := a.sourceRanges.Load()
+			if srcRng != nil {
+				for _, ranges := range *srcRng {
+					allRanges = append(allRanges, ranges...)
+				}
 			}
 			allRanges = append(allRanges, a.customRanges...)
 			newDB = core.NewDatabase(allRanges)
@@ -350,12 +354,13 @@ func (a *App) LookupBlockSource(ipStr string) []string {
 	}
 	ipU32 := binary.BigEndian.Uint32(ip)
 
-	if a.sourceRanges == nil {
+	srcRanges := a.sourceRanges.Load()
+	if srcRanges == nil {
 		return nil
 	}
 
 	var sources []string
-	for name, ranges := range a.sourceRanges {
+	for name, ranges := range *srcRanges {
 		for _, r := range ranges {
 			if ipU32 >= r.Start && ipU32 <= r.End {
 				sources = append(sources, name)
@@ -396,14 +401,11 @@ func (a *App) GetLanguage() string {
 
 // detectSystemLanguage detects the Windows UI language.
 func (a *App) detectSystemLanguage() string {
-	// Kernel32.GetUserDefaultUILanguage returns the default UI language ID
-	mod := syscall.NewLazyDLL("kernel32.dll")
-	proc := mod.NewProc("GetUserDefaultUILanguage")
-	ret, _, _ := proc.Call()
-	langID := uint16(ret)
-	primary := langID & 0x3FF
-	if primary == 0x15 {
-		return "pl"
+	langs, err := windows.GetUserPreferredUILanguages(windows.MUI_LANGUAGE_NAME)
+	if err == nil && len(langs) > 0 {
+		if len(langs[0]) >= 2 && langs[0][:2] == "pl" {
+			return "pl"
+		}
 	}
 	return "en"
 }
@@ -412,8 +414,11 @@ func (a *App) detectSystemLanguage() string {
 // Called after SaveConfig (custom rules changed) or when needed.
 func (a *App) rebuildDB() {
 	var allRanges []core.IPRange
-	for _, ranges := range a.sourceRanges {
-		allRanges = append(allRanges, ranges...)
+	srcRanges := a.sourceRanges.Load()
+	if srcRanges != nil {
+		for _, ranges := range *srcRanges {
+			allRanges = append(allRanges, ranges...)
+		}
 	}
 	allRanges = append(allRanges, a.customRanges...)
 	db := core.NewDatabase(allRanges)

@@ -103,6 +103,7 @@ func (a *Allowlist) StartRefreshLoop(interval time.Duration, done chan struct{})
 }
 
 func isIPString(s string) bool {
-	return net.ParseIP(s) != nil
+	ip := net.ParseIP(s)
+	return ip != nil && ip.To4() != nil
 }
 

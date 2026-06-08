@@ -53,6 +53,13 @@ var en = map[string]string{
 	"updater.loaded":                "Loaded %d ranges from %s",
 	"updater.db.reloaded":           "IP database reloaded: %d ranges (post-merge)",
 
+	// systray/tray.go
+	"systray.tooltip":               "GO PeerBlock - IP Filter",
+	"systray.show":                  "Show window",
+	"systray.disable":               "Disable protection",
+	"systray.enable":                "Enable protection",
+	"systray.quit":                  "Quit",
+
 	// main.go
 	"main.startup.error":            "Startup error: %v\nRun the application as Administrator.",
 	"main.wails.error":              "Wails startup error: %v",
@@ -88,6 +95,13 @@ var pl = map[string]string{
 	"updater.parse.error":           "Błąd parsowania %s: %v",
 	"updater.loaded":                "Załadowano %d zakresów z %s",
 	"updater.db.reloaded":           "Baza IP przeładowana: %d zakresów (po merge'u)",
+
+	// systray/tray.go
+	"systray.tooltip":               "GO PeerBlock - IP Filter",
+	"systray.show":                  "Pokaż okno",
+	"systray.disable":               "Wyłącz ochronę",
+	"systray.enable":                "Włącz ochronę",
+	"systray.quit":                  "Zamknij",
 
 	// main.go
 	"main.startup.error":            "Błąd uruchomienia: %v\nUruchom aplikację jako Administrator.",

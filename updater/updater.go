@@ -194,17 +194,17 @@ func (u *Updater) updateAll(silent bool) {
 
 	u.mu.Unlock()
 
-	// Lock only for the final merge + reload (fast operation)
-	u.mu.Lock()
 	// Copy LastSync back to the updater's source list
+	u.mu.Lock()
 	for i := range sources {
 		if !sources[i].LastSync.IsZero() && i < len(u.sources) {
 			u.sources[i].LastSync = sources[i].LastSync
 			u.sources[i].RangeCount = sources[i].RangeCount
 		}
 	}
-	newDB := core.NewDatabase(allRanges)
 	u.mu.Unlock()
+
+	newDB := core.NewDatabase(allRanges)
 
 	if u.onReload != nil {
 		u.onReload(newDB)
@@ -216,7 +216,6 @@ func (u *Updater) updateAll(silent bool) {
 
 func (u *Updater) logf(key string, args ...interface{}) {
 	if u.logFn != nil {
-		msg := i18n.T(u.lang, key, args...)
-		u.logFn("%s", msg)
+		u.logFn(i18n.T(u.lang, key, args...))
 	}
 }
