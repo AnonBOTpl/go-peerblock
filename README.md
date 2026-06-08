@@ -9,6 +9,9 @@
 
 > 🇵🇱 [Czytaj po polsku](README.pl.md)
 
+<img width="1011" height="753" alt="{8E4BB231-9101-4BB5-9664-F818C59F8D94}" src="https://github.com/user-attachments/assets/da668fe6-5877-468d-aceb-fb9361676d76" />
+
+
 ## Features
 
 - **⚡ Blazing fast** — IP lookup in ~186ns on 500,000+ ranges (2× faster than the 400ns target)
