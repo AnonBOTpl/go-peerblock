@@ -4,6 +4,40 @@ Wszystkie istotne zmiany w projekcie są dokumentowane w tym pliku.
 
 > 🇬🇧 [English version](CHANGELOG.md)
 
+## [0.4.1] — 2026-06-08
+
+### Naprawiono
+
+#### Sterownik WinDivert nie uruchamia się po restarcie
+
+- `main.go` — `installDriver()` przepisana: zamiast uruchamiania nieistniejącego pliku batch z `build/installer/install-driver.bat`, teraz bezpośrednio wywołuje komendy `sc`
+- `main.go` — dodano `isDriverInstalled()`: sprawdza czy wpis serwisu WinDivert istnieje (nie tylko czy jest uruchomiony)
+- `main.go` — dodano `findSysPath()`: szuka `WinDivert64.sys` w katalogu wykonawczym i bieżącym katalogu roboczym, obsługując zarówno środowisko uruchomieniowe jak i deweloperskie
+- `main.go` — dodano `removeDriverService()`: czyści zepsute wpisy serwisu WinDivert (np. gdy stary `binPath` wskazywał na katalog Temp który został wyczyszczony podczas restartu)
+- `installDriver()` obsługuje teraz 3 scenariusze: (1) sterownik działa → pomiń, (2) serwis istnieje ale zatrzymany → `sc start`, (3) serwis zepsuty → `sc delete` + `sc create` + `sc start`
+
+#### Naprawa zależności builda
+
+- `updater/updater_test.go` — dodano brakujący 6. parametr `"en"` we wszystkich 10 wywołaniach `NewUpdater()` (funkcja została zaktualizowana w v0.4.0 o parametr `lang`)
+
+### Zmieniono
+
+#### Instalator NSIS — auto-start sterownika
+
+- `build/windows/installer/project.nsi` — rejestracja serwisu WinDivert zmieniona z `start= demand` na `start= auto`
+- Przy świeżych instalacjach sterownik uruchomi się automatycznie podczas bootowania Windows, trwale eliminując problem "aplikacja nie startuje po restarcie"
+
+### Dodano
+
+#### Dokumentacja rozwiązywania problemów z WinDivert
+
+- `README.md` — nowa sekcja **Troubleshooting** z 4 podsekcjami:
+  - "App won't start after reboot" — przyczyna i instrukcja odzyskiwania krok po kroku z komendami `sc`
+  - "Check driver status" — jak sprawdzić czy WinDivert działa (`sc query`)
+  - "Driver doesn't auto-start after fresh install" — jak naprawić przez `sc config start= auto`
+  - "Run as Administrator" — wymagane uprawnienia
+- `README.pl.md` — te same treści przetłumaczone na polski w sekcji **Rozwiązywanie problemów**
+
 ## [0.4.0] — 2026-06-08
 
 ### Dodano

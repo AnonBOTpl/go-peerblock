@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 > 🇵🇱 [Polska wersja](CHANGELOG.pl.md)
 
+## [0.4.1] — 2026-06-08
+
+### Fixed
+
+#### WinDivert driver not starting after reboot
+
+- `main.go` — `installDriver()` rewritten: instead of running a non-existent batch file from `build/installer/install-driver.bat`, now calls `sc` commands directly
+- `main.go` — added `isDriverInstalled()`: checks if the WinDivert service entry exists (vs. just checking if it's running)
+- `main.go` — added `findSysPath()`: searches for `WinDivert64.sys` in the executable directory and current working directory, handling both installed runtime and development builds
+- `main.go` — added `removeDriverService()`: cleans up broken WinDivert service entries (e.g., when the old `binPath` pointed to a temp directory that was cleared on reboot)
+- `installDriver()` now handles 3 scenarios: (1) driver running → skip, (2) driver exists but stopped → `sc start`, (3) driver service broken → `sc delete` + `sc create` + `sc start`
+
+#### Build dependency fix
+
+- `updater/updater_test.go` — added missing 6th `"en"` parameter to all 10 `NewUpdater()` calls (the function was updated in v0.4.0 to accept a `lang` string)
+
+### Changed
+
+#### NSIS installer — driver auto-start
+
+- `build/windows/installer/project.nsi` — WinDivert service registration changed from `start= demand` to `start= auto`
+- On fresh installs, the driver will now start automatically when Windows boots, eliminating the "app won't start after reboot" issue permanently
+
+### Added
+
+#### WinDivert troubleshooting docs
+
+- `README.md` — new **Troubleshooting** section with 4 subsections:
+  - "App won't start after reboot" — cause and step-by-step recovery with `sc` commands
+  - "Check driver status" — how to verify WinDivert is running (`sc query`)
+  - "Driver doesn't auto-start after fresh install" — how to fix with `sc config start= auto`
+  - "Run as Administrator" — permission requirement
+- `README.pl.md` — same content translated to Polish in **Rozwiązywanie problemów** section
+
 ## [0.4.0] — 2026-06-08
 
 ### Added
