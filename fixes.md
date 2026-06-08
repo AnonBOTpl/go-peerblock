@@ -93,7 +93,7 @@
 - [ ] **A17** Statystyki historyczne z wykresami — liczniki nie resetują się przy restarcie, zapis do pliku, wykres "zablokowanych pakietów w ostatnich 24h/7 dniach"
 - [ ] **A18** Ciemny/jasny motyw — przełącznik motywu
 - [ ] **I6** Tryb nauki — zamiast blokować, przez X minut tylko loguj co by było zablokowane
-- [ ] **I7** Własne reguły użytkownika — plik `custom.txt` gdzie użytkownik wpisuje własne zakresy CIDR
+- [x] **I7** Własne reguły użytkownika — pole tekstowe w Ustawieniach, CIDR/zakresy/IP zapisywane w configu, merge'owane do bazy IP
 
 ---
 
@@ -114,10 +114,10 @@
 | Status | Liczba |
 |---|---|
 | ✅ Fixy wykonane | **20** |
-| ✅ Z audytu zrobione | **19** (A3–A14, I1–I3, I5, RingBuffer, Diff zakresów, Opcja "Nie pytaj") |
+| ✅ Z audytu zrobione | **22** (A3–A14, I1–I3, I5–I7, RingBuffer, Diff zakresów, Opcja "Nie pytaj", i18n Full, Backend i18n) |
 | ❌ Nie dotyczy | **2** (#13, #16) |
 | 🔴 Do zrobienia — krytyczne | **1** (A1) |
 | 🟠 Do zrobienia — warte dodania | **0** |
 | 🟡 Do zrobienia — drobne poprawki | **1** (I4) |
-| 🟢 Koncepcyjne / przyszłe | **6** (A15–A18, I6–I7) |
+| 🟢 Koncepcyjne / przyszłe | **4** (A15–A18) |
 | 🔮 go-dnsblock | **1** (integracja future) |
