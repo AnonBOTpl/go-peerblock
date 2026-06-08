@@ -10,6 +10,8 @@
 # ─── Build output ─────────────────────────────────────
 build/bin/
 frontend/dist/
+frontend/package.json.md5
+frontend/package-lock.json.md5
 
 # ─── Build artifacts (generated) ─────────────────────
 build/windows/installer/tmp/
